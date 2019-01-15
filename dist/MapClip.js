@@ -18,13 +18,32 @@ function _setPrototypeOf(o, p) { _setPrototypeOf = Object.setPrototypeOf || func
 
 function _assertThisInitialized(self) { if (self === void 0) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return self; }
 
-var MC = require("@kissmybutton/motorcortex"); // const Helper = MC.Helper;
-
+var MC = require("@kissmybutton/motorcortex");
 
 var helper = new MC.Helper();
-var ExtendableClip = MC.ExtendableClip; // const conf = MC.conf;
+var ExtendableClip = MC.ExtendableClip;
 
-var IframeMapContextHandler = require("./IframeMapContextHandler"); // const promise = Promise;
+var IframeMapContextHandler = require("./IframeMapContextHandler");
+
+var Promise = window.Promise;
+
+var Map = require("ol/Map.js").default;
+
+var View = require("ol/View.js").default; // const { easeIn, easeOut } = require("ol/easing.js");
+
+
+var TileLayer = require("ol/layer/Tile.js").default; // const { fromLonLat } = require("ol/proj.js");
+
+
+var OSM = require("ol/source/OSM.js").default;
+
+var _require = require("ol/control.js"),
+    Control = _require.Control,
+    defaultControls = _require.defaults; // const london = fromLonLat([-0.12755, 51.507222]);
+// const moscow = fromLonLat([37.6178, 55.7517]);
+// const istanbul = fromLonLat([28.9744, 41.0128]);
+// const rome = fromLonLat([12.5, 41.9]);
+// const bern = fromLonLat([7.4458, 46.95]);
 
 
 var MapClip =
@@ -32,18 +51,9 @@ var MapClip =
 function (_ExtendableClip) {
   _inherits(MapClip, _ExtendableClip);
 
-  /**
-   * @param {object} props - an object that should contain all of the
-   * following keys:
-   * - html (the html template to render)
-   * - css (the css template of the isolated tree)
-   * - initParams (optional / the initialisation parameters that will be
-   * passed both on the css and the html templates in order to render)
-   * - host (an Element object that will host the isolated tree)
-   * - containerParams (an object that holds parameters to affect the
-   * container of the isolated tree, e.g. width, height etc)
-   */
   function MapClip() {
+    var _this2 = this;
+
     var _this;
 
     var attrs = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
@@ -51,41 +61,56 @@ function (_ExtendableClip) {
 
     _classCallCheck(this, MapClip);
 
-    props.type = "iframe";
-    props.html = "\n      <html>\n          <head>\n            <script async defer src=\"https://maps.googleapis.com/maps/api/js?key=".concat(props.API_KEY, "&callback=initMap\"></script>\n            <script>\n              var initMap = () => {\n                var mymap = new google.maps.Map(document.body, ").concat(JSON.stringify(props.parameters), ");\n                parent.onMapLoad(mymap, google);\n              };\n            </script>\n          </head>\n          <body>\n          </body></html>\n    ");
-    _this = _possibleConstructorReturn(this, _getPrototypeOf(MapClip).call(this, attrs, props));
-    _this.props = props;
-    _this.props.selector = "";
-    _this.props.css = "";
+    return _possibleConstructorReturn(_this, new Promise(function (resolve, reject) {
+      global.resolveMap = resolve;
+      props.type = "iframe";
 
-    var checks = _this.runChecks(attrs, props);
+      if (props.mapType === "google") {
+        props.html = "\n          <div id=\"map\" class=\"map\"></div>\n          <script>\n            var script = document.createElement(\"script\");\n            script.src=\"https://maps.googleapis.com/maps/api/js?key=".concat(props.API_KEY, "\";\n            script.async = false;\n            script.defer = false;\n            script.onload = () => {\n              console.log(\"here\")\n              var mymap = new google.maps.Map(document.getElementById(\"map\"), ").concat(JSON.stringify(props.parameters), ");\n              parent.onMapLoad(mymap, google, parent.resolveMap);\n            };\n            document.getElementsByTagName(\"head\")[0].appendChild(script);\n            var style = document.createElement(\"style\");\n            style.innerHTML = \"#map{widht:100%;height:100%;} html, body{width:100%;height:100%;}\";\n            document.getElementsByTagName(\"head\")[0].appendChild(style);\n          </script>\n    ");
+      } else if (props.mapType === "ol") {
+        window.ol = {
+          Map: Map,
+          TileLayer: TileLayer,
+          OSM: OSM,
+          View: View,
+          Control: Control,
+          defaultControls: defaultControls
+        };
+        props.html = "\n          <div id=\"map\" class=\"map\"></div>\n          <script>\n              window.ol = parent.ol;\n              var script = document.createElement(\"script\");\n              script.src = \"https://cdn.polyfill.io/v2/polyfill.min.js?features=requestAnimationFrame,Element.prototype.classList,URL\";\n              script.async = true;\n              script.defer = true;\n              script.onload = () => {\n                var mymap = new ol.Map({\n                  target: document.getElementById(\"map\"),\n                  layers: [\n                    new ol.TileLayer({\n                      preload: 4,\n                      source: new ol.OSM()\n                    })\n                  ],\n                  // Improve user experience by loading tiles while animating. Will make\n                  // animations stutter on mobile or slow devices.\n                  loadTilesWhileAnimating: true,\n                  view: new ol.View({\n                    center: [3225415.454040626, 5014229.844289909],\n                    zoom: 6\n                  })\n                })\n                console.log(\"heere\")\n                parent.onMapLoad(mymap);\n              };\n              document.getElementsByTagName(\"head\")[0].appendChild(script);\n              var style = document.createElement(\"style\");\n              style.innerHTML = \"#map{widht:100%;height:100%;} html, body{width:100%;height:100%;}\";\n              document.getElementsByTagName(\"head\")[0].appendChild(style);\n              var olstyle = document.createElement(\"style\");\n              olstyle.href = \"https://openlayers.org/en/v5.3.0/css/ol.css\";\n              document.getElementsByTagName(\"head\")[0].appendChild(olstyle);\n            </script>";
+      }
 
-    if (!checks) {
-      return _possibleConstructorReturn(_this, false);
-    }
+      _this = _possibleConstructorReturn(_this2, _getPrototypeOf(MapClip).call(_this2, attrs, props));
+      _this.props = props;
+      _this.props.selector = "";
+      _this.props.css = "";
 
-    var ContextHanlder = null;
-    ContextHanlder = IframeMapContextHandler;
-    var contextHanlder = new ContextHanlder(props);
-    _this.ownContext = contextHanlder.context;
-    _this.isTheClip = true;
-    _this.attrs = JSON.parse(JSON.stringify(attrs));
-    _this.ownContext.mapRef = {};
-    _this.onLoad = global.onMapLoad = _this.onLoad.bind(_assertThisInitialized(_assertThisInitialized(_this)));
-    return _this;
+      var checks = _this.runChecks(attrs, props);
+
+      if (!checks) {
+        reject(new Error(false));
+      }
+
+      var ContextHanlder = null;
+      ContextHanlder = IframeMapContextHandler;
+      var contextHanlder = new ContextHanlder(props);
+      _this.ownContext = contextHanlder.context;
+      _this.isTheClip = true;
+      _this.attrs = JSON.parse(JSON.stringify(attrs));
+      _this.ownContext.mapRef = {};
+      _this.onLoad = _this.onLoad.bind(_assertThisInitialized(_assertThisInitialized(_this)));
+      global.onMapLoad = _this.onLoad;
+    }));
   }
 
   _createClass(MapClip, [{
     key: "onLoad",
-    value: function onLoad(mapRef, google) {
+    value: function onLoad(mapRef, google, resolve) {
       this.context.google = google;
-      this.context.mapRef = mapRef;
-      this.props.callback(mapRef);
-      global.onMapLoad = undefined;
-    }
-  }, {
-    key: "onClipInitialise",
-    value: function onClipInitialise() {// console.log(this, window);
+      this.context.mapRef = mapRef; // this.props.callback(mapRef);
+
+      window.onMapLoad = undefined; // window.ol = undefined;
+
+      resolve(this);
     }
   }, {
     key: "runChecks",
@@ -107,6 +132,16 @@ function (_ExtendableClip) {
 
       if (!props.hasOwnProperty("containerParams")) {
         helper.error("Self Contained Incident expects the 'containerParams'             key on its constructor properties which is missing");
+        return false;
+      }
+
+      if (!props.hasOwnProperty("mapType")) {
+        helper.error("Self Contained Incident expects the 'mapType'             key on its constructor properties which is missing");
+        return false;
+      }
+
+      if (props.mapType !== "google" && props.mapType !== "ol") {
+        helper.error("The mapType key value should either be 'google' or 'ol'");
         return false;
       }
 

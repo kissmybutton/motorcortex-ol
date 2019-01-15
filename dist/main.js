@@ -9,7 +9,7 @@ var MapClip = require("./MapClip");
 var ZoomTo = require("./ZoomTo");
 
 module.exports = {
-  npm_name: "@kissmybutton/motorcortex-googlemaps",
+  npm_name: "@kissmybutton/motorcortex-maps",
   incidents: [{
     exportable: MapClip,
     name: "MapClip"

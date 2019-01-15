@@ -109,10 +109,12 @@ function () {
 
     var head = iframeDocument.head || iframeDocument.getElementsByTagName("head")[0];
     head.appendChild(styleTag);
+    iframeDocument.close();
     this.context = {
       document: iframeDocument,
       window: iframe.contentWindow || iframe,
       rootElement: iframeDocument.body,
+      iframe: iframe,
       unmount: function unmount() {
         props.host.removeChild(iframe);
       },
@@ -121,7 +123,6 @@ function () {
       setMCID: this.setMCID.bind(this),
       getElementSelectorByMCID: this.getElementSelectorByMCID.bind(this)
     };
-    iframeDocument.close();
   }
 
   _createClass(Iframe3DContextHandler, [{

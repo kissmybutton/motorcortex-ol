@@ -118,10 +118,13 @@ class Iframe3DContextHandler {
       iframeDocument.head || iframeDocument.getElementsByTagName("head")[0];
     head.appendChild(styleTag);
 
+    iframeDocument.close();
+
     this.context = {
       document: iframeDocument,
       window: iframe.contentWindow || iframe,
       rootElement: iframeDocument.body,
+      iframe,
       unmount: function() {
         props.host.removeChild(iframe);
       },
@@ -130,8 +133,6 @@ class Iframe3DContextHandler {
       setMCID: this.setMCID.bind(this),
       getElementSelectorByMCID: this.getElementSelectorByMCID.bind(this)
     };
-
-    iframeDocument.close();
   }
 
   getElements(/*selector*/) {
