@@ -11,9 +11,6 @@ var ZoomTo = require("./ZoomTo");
 module.exports = {
   npm_name: "@kissmybutton/motorcortex-maps",
   incidents: [{
-    exportable: MapClip,
-    name: "MapClip"
-  }, {
     exportable: ZoomTo,
     name: "ZoomTo"
   }],

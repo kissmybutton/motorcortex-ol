@@ -12,7 +12,7 @@ const bern = fromLonLat([7.4458, 46.95]);
 const Maps = MC.loadPlugin(MapsDef);
 const host = document.getElementsByTagName("body")[0];
 const containerParams = { width: "100%", height: "100%" };
-const map = new Maps.MapClip(null, {
+const map = new Maps.Clip(null, {
   host,
   containerParams,
   parameters: {
