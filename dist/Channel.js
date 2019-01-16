@@ -29,7 +29,7 @@ function (_MC$AttributeChannel) {
     _this = _possibleConstructorReturn(this, _getPrototypeOf(Channel).call(this, props));
 
     _this.setComboAttributes({
-      center: ["lat", "lng"]
+      goto: ["center", "zoom"]
     });
 
     return _this;

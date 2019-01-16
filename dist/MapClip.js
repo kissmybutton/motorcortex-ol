@@ -23,28 +23,15 @@ var MC = require("@kissmybutton/motorcortex");
 var helper = new MC.Helper();
 var ExtendableClip = MC.ExtendableClip;
 
-var IframeMapContextHandler = require("./IframeMapContextHandler");
-
-var Promise = window.Promise;
+var WebComponentMapContextHandler = require("./WebComponentMapContextHandler");
 
 var Map = require("ol/Map.js").default;
 
-var View = require("ol/View.js").default; // const { easeIn, easeOut } = require("ol/easing.js");
+var View = require("ol/View.js").default;
 
-
-var TileLayer = require("ol/layer/Tile.js").default; // const { fromLonLat } = require("ol/proj.js");
-
+var TileLayer = require("ol/layer/Tile.js").default;
 
 var OSM = require("ol/source/OSM.js").default;
-
-var _require = require("ol/control.js"),
-    Control = _require.Control,
-    defaultControls = _require.defaults; // const london = fromLonLat([-0.12755, 51.507222]);
-// const moscow = fromLonLat([37.6178, 55.7517]);
-// const istanbul = fromLonLat([28.9744, 41.0128]);
-// const rome = fromLonLat([12.5, 41.9]);
-// const bern = fromLonLat([7.4458, 46.95]);
-
 
 var MapClip =
 /*#__PURE__*/
@@ -52,8 +39,6 @@ function (_ExtendableClip) {
   _inherits(MapClip, _ExtendableClip);
 
   function MapClip() {
-    var _this2 = this;
-
     var _this;
 
     var attrs = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
@@ -61,67 +46,55 @@ function (_ExtendableClip) {
 
     _classCallCheck(this, MapClip);
 
-    return _possibleConstructorReturn(_this, new Promise(function (resolve, reject) {
-      global.resolveMap = resolve;
-      props.type = "iframe";
+    props.css = "#map{width:100%;height:100%;}";
+    props.html = "\n      <div id=\"map\" class=\"map\"></div>\n      <link rel=\"stylesheet\" href=\"https://openlayers.org/en/v5.3.0/css/ol.css\">";
+    props.selector = "";
+    _this = _possibleConstructorReturn(this, _getPrototypeOf(MapClip).call(this, attrs, props));
 
-      if (props.mapType === "google") {
-        props.html = "\n          <div id=\"map\" class=\"map\"></div>\n          <script>\n            var script = document.createElement(\"script\");\n            script.src=\"https://maps.googleapis.com/maps/api/js?key=".concat(props.API_KEY, "\";\n            script.async = false;\n            script.defer = false;\n            script.onload = () => {\n              console.log(\"here\")\n              var mymap = new google.maps.Map(document.getElementById(\"map\"), ").concat(JSON.stringify(props.parameters), ");\n              parent.onMapLoad(mymap, google, parent.resolveMap);\n            };\n            document.getElementsByTagName(\"head\")[0].appendChild(script);\n            var style = document.createElement(\"style\");\n            style.innerHTML = \"#map{widht:100%;height:100%;} html, body{width:100%;height:100%;}\";\n            document.getElementsByTagName(\"head\")[0].appendChild(style);\n          </script>\n    ");
-      } else if (props.mapType === "ol") {
-        window.ol = {
-          Map: Map,
-          TileLayer: TileLayer,
-          OSM: OSM,
-          View: View,
-          Control: Control,
-          defaultControls: defaultControls
-        };
-        props.html = "\n          <div id=\"map\" class=\"map\"></div>\n          <script>\n              window.ol = parent.ol;\n              var script = document.createElement(\"script\");\n              script.src = \"https://cdn.polyfill.io/v2/polyfill.min.js?features=requestAnimationFrame,Element.prototype.classList,URL\";\n              script.async = true;\n              script.defer = true;\n              script.onload = () => {\n                var mymap = new ol.Map({\n                  target: document.getElementById(\"map\"),\n                  layers: [\n                    new ol.TileLayer({\n                      preload: 4,\n                      source: new ol.OSM()\n                    })\n                  ],\n                  // Improve user experience by loading tiles while animating. Will make\n                  // animations stutter on mobile or slow devices.\n                  loadTilesWhileAnimating: true,\n                  view: new ol.View({\n                    center: [3225415.454040626, 5014229.844289909],\n                    zoom: 6\n                  })\n                })\n                console.log(\"heere\")\n                parent.onMapLoad(mymap);\n              };\n              document.getElementsByTagName(\"head\")[0].appendChild(script);\n              var style = document.createElement(\"style\");\n              style.innerHTML = \"#map{widht:100%;height:100%;} html, body{width:100%;height:100%;}\";\n              document.getElementsByTagName(\"head\")[0].appendChild(style);\n              var olstyle = document.createElement(\"style\");\n              olstyle.href = \"https://openlayers.org/en/v5.3.0/css/ol.css\";\n              document.getElementsByTagName(\"head\")[0].appendChild(olstyle);\n            </script>";
-      }
+    if (!_this.runChecks(attrs, props)) {
+      return _possibleConstructorReturn(_this, false);
+    }
 
-      _this = _possibleConstructorReturn(_this2, _getPrototypeOf(MapClip).call(_this2, attrs, props));
-      _this.props = props;
-      _this.props.selector = "";
-      _this.props.css = "";
+    _this.ownContext = new WebComponentMapContextHandler(props).context;
+    _this.rootElement = _this.context.rootElement;
+    _this.isTheClip = true;
+    _this.loadScripts = _this.loadScripts.bind(_assertThisInitialized(_assertThisInitialized(_this)));
+    _this.initMap = _this.initMap.bind(_assertThisInitialized(_assertThisInitialized(_this)));
 
-      var checks = _this.runChecks(attrs, props);
+    _this.loadScripts();
 
-      if (!checks) {
-        reject(new Error(false));
-      }
+    _this.initMap();
 
-      var ContextHanlder = null;
-      ContextHanlder = IframeMapContextHandler;
-      var contextHanlder = new ContextHanlder(props);
-      _this.ownContext = contextHanlder.context;
-      _this.isTheClip = true;
-      _this.attrs = JSON.parse(JSON.stringify(attrs));
-      _this.ownContext.mapRef = {};
-      _this.onLoad = _this.onLoad.bind(_assertThisInitialized(_assertThisInitialized(_this)));
-      global.onMapLoad = _this.onLoad;
-    }));
+    return _this;
   }
 
   _createClass(MapClip, [{
-    key: "onLoad",
-    value: function onLoad(mapRef, google, resolve) {
-      this.context.google = google;
-      this.context.mapRef = mapRef; // this.props.callback(mapRef);
-
-      window.onMapLoad = undefined; // window.ol = undefined;
-
-      resolve(this);
+    key: "initMap",
+    value: function initMap() {
+      this.context.mapRef = new Map({
+        target: this.rootElement.getElementsByClassName("map")[0],
+        layers: [new TileLayer({
+          preload: 4,
+          source: new OSM()
+        })],
+        loadTilesWhileAnimating: true,
+        view: new View(this.props.parameters.view)
+      });
+    }
+  }, {
+    key: "loadScripts",
+    value: function loadScripts() {
+      var script = document.createElement("script");
+      script.src = "https://cdn.polyfill.io/v2/polyfill.min.js?features=requestAnimationFrame,Element.prototype.classList,URL";
+      script.async = true;
+      script.defer = true;
+      document.getElementsByTagName("head")[0].appendChild(script);
     }
   }, {
     key: "runChecks",
     value: function runChecks(attrs, props) {
       if (!helper.isObject(props)) {
         helper.error("Self Contained Incident expects an object on its                 second argument on the constructor. ".concat(_typeof(props), " passed"));
-        return false;
-      }
-
-      if (!props.hasOwnProperty("id")) {
-        helper.error("Self Contained Incident expects the 'id' key on its                 constructor properties which is missing");
         return false;
       }
 
