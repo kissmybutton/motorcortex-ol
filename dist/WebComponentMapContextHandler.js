@@ -115,7 +115,7 @@ function () {
     value: function getElementByMCID()
     /*mcid*/
     {
-      return [this.context.mapRef];
+      return this.context.mapRef;
     }
   }, {
     key: "getElements",
@@ -126,17 +126,13 @@ function () {
     }
   }, {
     key: "getMCID",
-    value: function getMCID()
-    /*element*/
-    {
-      return "mymap";
+    value: function getMCID(element) {
+      return element.mcid;
     }
   }, {
     key: "setMCID",
-    value: function setMCID(element
-    /*, mcid*/
-    ) {
-      element.mcid = element.id;
+    value: function setMCID(element, mcid) {
+      element.mcid = mcid;
     }
   }, {
     key: "getElementSelectorByMCID",

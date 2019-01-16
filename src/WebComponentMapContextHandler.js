@@ -75,7 +75,6 @@ class WebComponentMapContextHandler {
         }
       }
     }
-
     wrapper.style.overflow = "hidden";
 
     this.rootElement = wrapper;
@@ -99,18 +98,18 @@ class WebComponentMapContextHandler {
   }
 
   getElementByMCID(/*mcid*/) {
-    return [this.context.mapRef];
+    return this.context.mapRef;
   }
   getElements(/*selector*/) {
     return [this.context.mapRef];
   }
 
-  getMCID(/*element*/) {
-    return "mymap";
+  getMCID(element) {
+    return element.mcid;
   }
 
-  setMCID(element /*, mcid*/) {
-    element.mcid = element.id;
+  setMCID(element, mcid) {
+    element.mcid = mcid;
   }
 
   getElementSelectorByMCID(/*mcid*/) {
