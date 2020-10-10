@@ -1,34 +1,19 @@
-const MC = require("@kissmybutton/motorcortex");
-const { inAndOut } = require("ol/easing.js");
+import MC from "@kissmybutton/motorcortex";
+import { inAndOut } from "ol/easing.js";
 
-class ZoomTo extends MC.TimedIncident {
-  constructor(attrs, props) {
-    super(attrs, props);
-    this.previousMs = -100;
-    this.zoomChanged = true;
-    this.onCompleteZoom = this.onCompleteZoom.bind(this);
-    this.init = this.init.bind(this);
-  }
+export default class ZoomTo extends MC.API.MonoIncident {
   onGetContext() {
-    global.map = this.context.mapRef;
-    this.view = this.context.mapRef.getView();
+    this.view = this.element.entity.getView();
     this.init(this.attrs.animatedAttrs.goto);
   }
 
   getScratchValue(/*mcid, attribute*/) {
     const _goto = {
-      zoom: this.context.mapRef.getView().getZoom(),
-      center: this.context.mapRef.getView().getCenter(),
-      rotation: this.context.mapRef.getView().getRotation()
+      zoom: this.element.entity.getView().getZoom(),
+      center: this.element.entity.getView().getCenter(),
+      rotation: this.element.entity.getView().getRotation()
     };
     return _goto;
-  }
-
-  onCompleteZoom() {
-    this.zoomChanged = true;
-  }
-  onCompleteCenter() {
-    this.centerChanged = true;
   }
 
   init(options) {
@@ -116,5 +101,3 @@ class ZoomTo extends MC.TimedIncident {
     this.animate(progress);
   }
 }
-
-module.exports = ZoomTo;
