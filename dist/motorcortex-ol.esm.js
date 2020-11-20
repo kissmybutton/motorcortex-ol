@@ -29600,8 +29600,8 @@ function (XYZ) {
 
 var olMap =
 /*#__PURE__*/
-function (_MC$API$DOMClip) {
-  _inherits(olMap, _MC$API$DOMClip);
+function (_MC$BrowserClip) {
+  _inherits(olMap, _MC$BrowserClip);
 
   function olMap() {
     _classCallCheck(this, olMap);
@@ -29626,12 +29626,12 @@ function (_MC$API$DOMClip) {
   }]);
 
   return olMap;
-}(MC.API.DOMClip);
+}(MC.BrowserClip);
 
 var ZoomTo =
 /*#__PURE__*/
-function (_MC$API$MonoIncident) {
-  _inherits(ZoomTo, _MC$API$MonoIncident);
+function (_MC$Effect) {
+  _inherits(ZoomTo, _MC$Effect);
 
   function ZoomTo() {
     _classCallCheck(this, ZoomTo);
@@ -29733,7 +29733,7 @@ function (_MC$API$MonoIncident) {
   }]);
 
   return ZoomTo;
-}(MC.API.MonoIncident);
+}(MC.Effect);
 
 var index = {
   npm_name: "@kissmybutton/motorcortex-ol",

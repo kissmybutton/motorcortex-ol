@@ -1,7 +1,7 @@
 import MC from "@kissmybutton/motorcortex";
 import { inAndOut } from "ol/easing.js";
 
-export default class ZoomTo extends MC.API.MonoIncident {
+export default class ZoomTo extends MC.Effect {
   onGetContext() {
     this.view = this.element.entity.getView();
     this.init(this.attrs.animatedAttrs.goto);
