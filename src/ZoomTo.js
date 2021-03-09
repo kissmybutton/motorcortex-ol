@@ -4,7 +4,7 @@ import { inAndOut } from "ol/easing.js";
 export default class ZoomTo extends MC.Effect {
   onGetContext() {
     this.view = this.element.entity.getView();
-    this.init(this.attrs.animatedAttrs.goto);
+    this.init();
   }
 
   getScratchValue(/*mcid, attribute*/) {
@@ -16,8 +16,9 @@ export default class ZoomTo extends MC.Effect {
     return _goto;
   }
 
-  init(options) {
-    const initialValue = this.getInitialValue("goto");
+  init() {
+    const options = this.targetValue;
+    const initialValue = this.initialValue;
     const center = initialValue.center.slice();
     const resolution = this.view.getResolutionForZoom(initialValue.zoom);
     const rotation = initialValue.rotation;

@@ -48,7 +48,7 @@ const zoomto2 = new Maps.ZoomTo(
   },
   { duration: 4000, selector: "!#olmap" }
 );
-map.addIncident(zoomto1, 4000);
-map.addIncident(zoomto2, 8000);
+map.addIncident(zoomto1, 0);
+map.addIncident(zoomto2, 4000);
 
 new Player({ clip: map,theme:"mc-blue" });
