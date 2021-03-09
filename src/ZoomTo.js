@@ -1,7 +1,7 @@
-import MC from "@kissmybutton/motorcortex";
+import MotorCortex from "@kissmybutton/motorcortex";
 import { inAndOut } from "ol/easing.js";
 
-export default class ZoomTo extends MC.Effect {
+export default class ZoomTo extends MotorCortex.Effect {
   onGetContext() {
     this.view = this.element.entity.getView();
     this.init();
