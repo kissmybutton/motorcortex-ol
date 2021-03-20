@@ -120,7 +120,7 @@
     "lint-staged": "8.2.1",
     "npm-check-updates": "*",
     "npx": "*",
-    "prettier": "1.15.3",
+    "prettier": "1.19.1",
     "rimraf": "2.6.3",
     "rollup": "2.29.0",
     "rollup-plugin-babel": "4.4.0",
