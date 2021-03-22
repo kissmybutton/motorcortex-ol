@@ -1,6 +1,6 @@
 {
   "name": "@kissmybutton/motorcortex-ol",
-  "version": "2.0.3",
+  "version": "2.0.4",
   "description": "Openlayers map plugin for MotorCortex",
   "main": "dist/motorcortex-ol.cjs.js",
   "module": "dist/motorcortex-ol.esm.js",
