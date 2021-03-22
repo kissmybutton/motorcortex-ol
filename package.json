@@ -75,13 +75,13 @@
     }
   },
   "dependencies": {
-    "monorepo": "^1.2.2",
     "ol": "^6.5.0"
   },
   "peerDependencies": {
     "@kissmybutton/motorcortex": "^6.3.2"
   },
   "devDependencies": {
+    "monorepo": "^1.2.2",
     "@babel/cli": "7.13.10",
     "@babel/core": "7.13.10",
     "@babel/preset-env": "7.13.10",
