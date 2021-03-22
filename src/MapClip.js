@@ -4,7 +4,7 @@ import View from "ol/View";
 import Tile from "ol/layer/Tile";
 import OSM from "ol/source/OSM";
 
-export default class olMap extends MC.API.DOMClip {
+export default class olMap extends MC.BrowserClip {
   onAfterRender() {
     const olMap = new Map({
       target: this.context.rootElement,

@@ -1,55 +1,54 @@
 import MC from "@kissmybutton/motorcortex";
 import { inAndOut } from "ol/easing.js";
 
-export default class ZoomTo extends MC.API.MonoIncident {
+export default class ZoomTo extends MC.Effect {
   onGetContext() {
+    //initialize the animation object
+
     this.view = this.element.entity.getView();
-    this.init(this.attrs.animatedAttrs.goto);
+    const resolution = this.view.getResolutionForZoom(this.initialValue.zoom);
+
+    this.animation = {
+      anchor: this.targetValue.anchor,
+      easing: inAndOut
+    };
+
+    if (this.targetValue.center) {
+      this.animation.sourceCenter = this.initialValue.center;
+      this.animation.targetCenter = this.targetValue.center;
+    }
+
+    if (this.targetValue.zoom !== undefined) {
+      this.animation.sourceResolution = resolution;
+      this.animation.targetResolution = this.view.constrainResolution(
+        this.view.maxResolution_,
+        this.targetValue.zoom - this.view.minZoom_,
+        0
+      );
+    } else if (resolution) {
+      this.animation.sourceResolution = resolution;
+      this.animation.targetResolution = resolution;
+    }
+
+    //to do: in case we implement rotation
+    if (this.targetValue.rotation !== undefined) {
+      this.animation.sourceRotation = this.initialValue.rotation;
+      const delta =
+        ((this.targetValue.rotation - this.initialValue.rotation + Math.PI) %
+          (2 * Math.PI)) -
+        Math.PI;
+      this.animation.targetRotation = this.initialValue.rotation + delta;
+    }
   }
 
-  getScratchValue(/*mcid, attribute*/) {
+  getScratchValue() {
     const _goto = {
       zoom: this.element.entity.getView().getZoom(),
       center: this.element.entity.getView().getCenter(),
       rotation: this.element.entity.getView().getRotation()
     };
+
     return _goto;
-  }
-
-  init(options) {
-    const initialValue = this.getInitialValue("goto");
-    const center = initialValue.center.slice();
-    const resolution = this.view.getResolutionForZoom(initialValue.zoom);
-    const rotation = initialValue.rotation;
-
-    this.animation = {
-      anchor: options.anchor,
-      easing: options.easing || inAndOut
-    };
-
-    if (options.center) {
-      this.animation.sourceCenter = center;
-      this.animation.targetCenter = options.center;
-    }
-
-    if (options.zoom !== undefined) {
-      this.animation.sourceResolution = resolution;
-      this.animation.targetResolution = this.view.constrainResolution(
-        this.view.maxResolution_,
-        options.zoom - this.view.minZoom_,
-        0
-      );
-    } else if (options.resolution) {
-      this.animation.sourceResolution = resolution;
-      this.animation.targetResolution = options.resolution;
-    }
-
-    if (options.rotation !== undefined) {
-      this.animation.sourceRotation = rotation;
-      const delta =
-        ((options.rotation - rotation + Math.PI) % (2 * Math.PI)) - Math.PI;
-      this.animation.targetRotation = rotation + delta;
-    }
   }
 
   animate(progress) {
@@ -63,6 +62,7 @@ export default class ZoomTo extends MC.API.MonoIncident {
       const y = y0 + progress * (y1 - y0);
       this.view.setCenter([x, y]);
     }
+
     if (this.animation.sourceResolution && this.animation.targetResolution) {
       const resolution =
         progress === 1
@@ -78,6 +78,8 @@ export default class ZoomTo extends MC.API.MonoIncident {
       }
       this.view.setResolution(resolution);
     }
+
+    //to do: in case we implement rotation
     if (
       this.animation.sourceRotation !== undefined &&
       this.animation.targetRotation !== undefined
@@ -97,6 +99,7 @@ export default class ZoomTo extends MC.API.MonoIncident {
       this.view.setRotation(rotation);
     }
   }
+
   onProgress(progress /*, millisecond*/) {
     this.animate(progress);
   }

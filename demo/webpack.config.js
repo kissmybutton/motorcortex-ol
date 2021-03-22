@@ -10,6 +10,7 @@ module.exports = {
     extensions: [".js"],
     modules: [path.resolve("./"), "node_modules"]
   },
+
   output: {
     filename: "bundle.js",
     // the output bundle
@@ -67,7 +68,9 @@ module.exports = {
     new webpack.NoEmitOnErrorsPlugin()
     // do not emit compiled assets that include errors
   ],
-
+  node: {
+    fs: "empty"
+  },
   devServer: {
     watchContentBase: true, // initiate a page refresh if static content changes
     host: "0.0.0.0",
