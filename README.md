@@ -10,7 +10,7 @@ $ yarn add @kissmybutton/motorcortex-ol
 ```
 
 ```javascript
-import Openlayers from "@kissmybutton/motorcortex-subtitles";
+import Openlayers from "@kissmybutton/motorcortex-ol";
 ```
 
 
