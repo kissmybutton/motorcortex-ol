@@ -11,11 +11,12 @@ export default class olMap extends MC.BrowserClip {
       layers: [
         new Tile({
           preload: 4,
-          source: new OSM()
-        })
+          source: new OSM(),
+        }),
       ],
+      controls: [],
       loadTilesWhileAnimating: true,
-      view: new View(this.attrs.parameters.view)
+      view: new View(this.attrs.parameters.view),
     });
     this.setCustomEntity("olmap", olMap, ["maps"]);
   }
