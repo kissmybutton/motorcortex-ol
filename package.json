@@ -81,7 +81,6 @@
     "@kissmybutton/motorcortex": "^6.3.2"
   },
   "devDependencies": {
-    "monorepo": "^1.2.2",
     "@babel/cli": "7.13.10",
     "@babel/core": "7.13.10",
     "@babel/preset-env": "7.13.10",
@@ -116,6 +115,7 @@
     "imports-loader": "^2.0.0",
     "json-stringify-safe": "5.0.1",
     "lint-staged": "^10.5.4",
+    "monorepo": "^1.2.2",
     "npm-check-updates": "*",
     "npx": "*",
     "prettier": "^2.2.1",
