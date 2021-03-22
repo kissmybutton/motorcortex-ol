@@ -1,21 +1,70 @@
-# ADD YOU PACKAGE NAME
+# MotorCortex Openlayers
 
-[![Build Status](https://travis-ci.org/kissmybutton/REPO_NAME.svg?branch=master)](https://travis-ci.org/kissmybutton/REPO_NAME) ![npm (scoped)](https://img.shields.io/npm/v/@kissmybutton/REPO_NAME.svg) [![Coverage Status](https://coveralls.io/repos/github/kissmybutton/REPO_NAME/badge.svg?branch=master)](https://coveralls.io/github/kissmybutton/REPO_NAME?branch=master)[![semantic-release](https://img.shields.io/badge/%20%20%F0%9F%93%A6%F0%9F%9A%80-semantic--release-e10079.svg)](https://github.com/semantic-release/semantic-release) [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/kissmybutton/REPO_NAME/blob/master/CONTRIBUTING.md)
+[Openlayers](https://openlayers.org/) library as a MotorCortex Incident
 
-> WRITE A SMALL DESCRIPTION
+## Installation
+```bash
+$ npm install @kissmybutton/motorcortex-ol
+# OR
+$ yarn add @kissmybutton/motorcortex-ol
+```
 
-## Demo
+```javascript
+import Openlayers from "@kissmybutton/motorcortex-subtitles";
+```
 
-ADD LINK TO DEMO
 
-## Getting Started
+## Key Concepts / Features
+MotorCortex Openlayers takes the capabilities of Openlayers library of creating a dynamic map in any web page.
+The library exposes a Map Clip with the name Clip which will initialize an Openlayer Map instance where you can add animation with the "GoTo" Incident.
 
-HOW CAN YOU USERS INSTALL AND USE YOUR LIB
 
 ## Documentation
+### Import and load the plugin to MotorCortex
+```javascript
+import MC from "@kissmybutton/motorcortex";
+import MapsDef from "@kissmybutton/motorcortex-ol";
 
-PROVIDE SOME DOCUMENTATION AND LINKS FOR THE FULL DOCUMENTATION
+const Maps = MC.loadPlugin(MapsDef);
 
-## Contributing
+const london = MapsDef.utils.fromLonLat([-0.12755, 51.507222]);
+const bern = MapsDef.utils.fromLonLat([7.4458, 46.95]);
 
-The contribution workflow is documented at [CONTRIBUTING.md](/blob/master/CONTRIBUTING.md)
+const clip = new Maps.Clip(
+  {
+    parameters: {
+      view: { center: london, zoom: 8 }
+    }
+  },
+  {
+    host: document.getElementById("clip"),
+    containerParams: { width: "1280px", height: "720px" }
+  }
+);
+
+const gotoBern = new Maps.GoTo(
+  {
+    animatedAttrs: {
+      goto: {
+        zoom: 3,
+        center: bern
+      }
+    }
+  },
+  { duration: 4000, selector: "!#olmap" }
+);
+
+clip.addIncident(gotoBern, 0);
+clip.play()
+```
+
+### Demo
+https://kissmybutton.github.io/motorcortex-ol/demo/
+
+
+## License
+[MIT License](https://opensource.org/licenses/MIT)
+
+  
+  
+[![Kiss My Button](https://presskit.kissmybutton.gr/logos/kissmybutton-logo-small.png)](https://kissmybutton.gr)

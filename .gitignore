@@ -1,11 +1,12 @@
 # Node modules
 node_modules
+dist
+# demo/bundle.js
 
 # Coverage
 coverage
 
 # Output folders
-# dist
 build
 compiled
 .nyc_output

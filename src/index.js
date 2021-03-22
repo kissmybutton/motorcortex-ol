@@ -1,13 +1,13 @@
 import Clip from "./MapClip";
-import ZoomTo from "./ZoomTo";
+import GoTo from "./GoTo";
 import { fromLonLat } from "ol/proj.js";
 
 export default {
   npm_name: "@kissmybutton/motorcortex-ol",
   incidents: [
     {
-      exportable: ZoomTo,
-      name: "ZoomTo",
+      exportable: GoTo,
+      name: "GoTo",
       attributesValidationRules: {
         animatedAttrs: {
           type: "object",

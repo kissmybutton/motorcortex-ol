@@ -6696,6 +6696,19 @@ function createProjection(projection, defaultCode) {
   }
 }
 /**
+ * Transforms a coordinate from longitude/latitude to a different projection.
+ * @param {import("./coordinate.js").Coordinate} coordinate Coordinate as longitude and latitude, i.e.
+ *     an array with longitude as 1st and latitude as 2nd element.
+ * @param {ProjectionLike=} opt_projection Target projection. The
+ *     default is Web Mercator, i.e. 'EPSG:3857'.
+ * @return {import("./coordinate.js").Coordinate} Coordinate projected to the target projection.
+ * @api
+ */
+
+function fromLonLat(coordinate, opt_projection) {
+  return transform(coordinate, 'EPSG:4326', opt_projection !== undefined ? opt_projection : 'EPSG:3857');
+}
+/**
  * Checks if two projections are the same, that is every coordinate in one
  * projection does represent the same geographic point as the same coordinate in
  * the other projection.
@@ -29606,8 +29619,8 @@ function (XYZ) {
 
 var olMap =
 /*#__PURE__*/
-function (_MC$API$DOMClip) {
-  _inherits(olMap, _MC$API$DOMClip);
+function (_MC$BrowserClip) {
+  _inherits(olMap, _MC$BrowserClip);
 
   function olMap() {
     _classCallCheck(this, olMap);
@@ -29632,67 +29645,59 @@ function (_MC$API$DOMClip) {
   }]);
 
   return olMap;
-}(MC__default['default'].API.DOMClip);
+}(MC__default['default'].BrowserClip);
 
-var ZoomTo =
+var GoTo =
 /*#__PURE__*/
-function (_MC$API$MonoIncident) {
-  _inherits(ZoomTo, _MC$API$MonoIncident);
+function (_MC$Effect) {
+  _inherits(GoTo, _MC$Effect);
 
-  function ZoomTo() {
-    _classCallCheck(this, ZoomTo);
+  function GoTo() {
+    _classCallCheck(this, GoTo);
 
-    return _possibleConstructorReturn(this, _getPrototypeOf(ZoomTo).apply(this, arguments));
+    return _possibleConstructorReturn(this, _getPrototypeOf(GoTo).apply(this, arguments));
   }
 
-  _createClass(ZoomTo, [{
+  _createClass(GoTo, [{
     key: "onGetContext",
     value: function onGetContext() {
+      //initialize the animation object
       this.view = this.element.entity.getView();
-      this.init(this.attrs.animatedAttrs.goto);
+      var resolution = this.view.getResolutionForZoom(this.initialValue.zoom);
+      this.animation = {
+        anchor: this.targetValue.anchor,
+        easing: inAndOut
+      };
+
+      if (this.targetValue.center) {
+        this.animation.sourceCenter = this.initialValue.center;
+        this.animation.targetCenter = this.targetValue.center;
+      }
+
+      if (this.targetValue.zoom !== undefined) {
+        this.animation.sourceResolution = resolution;
+        this.animation.targetResolution = this.view.constrainResolution(this.view.maxResolution_, this.targetValue.zoom - this.view.minZoom_, 0);
+      } else if (resolution) {
+        this.animation.sourceResolution = resolution;
+        this.animation.targetResolution = resolution;
+      } //to do: in case we implement rotation
+
+
+      if (this.targetValue.rotation !== undefined) {
+        this.animation.sourceRotation = this.initialValue.rotation;
+        var delta = (this.targetValue.rotation - this.initialValue.rotation + Math.PI) % (2 * Math.PI) - Math.PI;
+        this.animation.targetRotation = this.initialValue.rotation + delta;
+      }
     }
   }, {
     key: "getScratchValue",
-    value: function getScratchValue()
-    /*mcid, attribute*/
-    {
+    value: function getScratchValue() {
       var _goto = {
         zoom: this.element.entity.getView().getZoom(),
         center: this.element.entity.getView().getCenter(),
         rotation: this.element.entity.getView().getRotation()
       };
       return _goto;
-    }
-  }, {
-    key: "init",
-    value: function init(options) {
-      var initialValue = this.getInitialValue("goto");
-      var center = initialValue.center.slice();
-      var resolution = this.view.getResolutionForZoom(initialValue.zoom);
-      var rotation = initialValue.rotation;
-      this.animation = {
-        anchor: options.anchor,
-        easing: options.easing || inAndOut
-      };
-
-      if (options.center) {
-        this.animation.sourceCenter = center;
-        this.animation.targetCenter = options.center;
-      }
-
-      if (options.zoom !== undefined) {
-        this.animation.sourceResolution = resolution;
-        this.animation.targetResolution = this.view.constrainResolution(this.view.maxResolution_, options.zoom - this.view.minZoom_, 0);
-      } else if (options.resolution) {
-        this.animation.sourceResolution = resolution;
-        this.animation.targetResolution = options.resolution;
-      }
-
-      if (options.rotation !== undefined) {
-        this.animation.sourceRotation = rotation;
-        var delta = (options.rotation - rotation + Math.PI) % (2 * Math.PI) - Math.PI;
-        this.animation.targetRotation = rotation + delta;
-      }
     }
   }, {
     key: "animate",
@@ -29717,7 +29722,8 @@ function (_MC$API$MonoIncident) {
         }
 
         this.view.setResolution(resolution);
-      }
+      } //to do: in case we implement rotation
+
 
       if (this.animation.sourceRotation !== undefined && this.animation.targetRotation !== undefined) {
         var rotation = progress === 1 ? (this.animation.targetRotation + Math.PI) % (2 * Math.PI) - Math.PI : this.animation.sourceRotation + progress * (this.animation.targetRotation - this.animation.sourceRotation);
@@ -29738,19 +29744,44 @@ function (_MC$API$MonoIncident) {
     }
   }]);
 
-  return ZoomTo;
-}(MC__default['default'].API.MonoIncident);
+  return GoTo;
+}(MC__default['default'].Effect);
 
 var index = {
   npm_name: "@kissmybutton/motorcortex-ol",
   incidents: [{
-    exportable: ZoomTo,
-    name: "ZoomTo"
+    exportable: GoTo,
+    name: "GoTo",
+    attributesValidationRules: {
+      animatedAttrs: {
+        type: "object",
+        props: {
+          goto: {
+            type: "object",
+            props: {
+              zoom: {
+                type: "number",
+                min: 0
+              },
+              center: {
+                type: "array",
+                items: "number",
+                min: 2,
+                max: 2
+              }
+            }
+          }
+        }
+      }
+    }
   }],
   compositeAttributes: {
     goto: ["center", "zoom"]
   },
-  Clip: olMap
+  Clip: olMap,
+  utils: {
+    fromLonLat: fromLonLat
+  }
 };
 
 module.exports = index;

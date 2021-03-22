@@ -1,7 +1,7 @@
 import MC from "@kissmybutton/motorcortex";
 import { inAndOut } from "ol/easing.js";
 
-export default class ZoomTo extends MC.Effect {
+export default class GoTo extends MC.Effect {
   onGetContext() {
     //initialize the animation object
 

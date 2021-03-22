@@ -20,7 +20,7 @@ const map = new Maps.Clip(
   }
 );
 
-const gotoBern = new Maps.ZoomTo(
+const gotoBern = new Maps.GoTo(
   {
     animatedAttrs: {
       goto: {
@@ -32,7 +32,7 @@ const gotoBern = new Maps.ZoomTo(
   { duration: 4000, selector: "!#olmap" }
 );
 
-const gotoMoscow = new Maps.ZoomTo(
+const gotoMoscow = new Maps.GoTo(
   {
     animatedAttrs: {
       goto: {
