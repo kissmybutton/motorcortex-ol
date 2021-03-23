@@ -1,5 +1,4 @@
 import MC from "@kissmybutton/motorcortex";
-import { inAndOut } from "ol/easing.js";
 
 export default class ZoomTo extends MC.Effect {
   onGetContext() {
@@ -7,7 +6,6 @@ export default class ZoomTo extends MC.Effect {
     this.view = this.element.entity.getView();
     this.animation = {
       anchor: this.targetValue.anchor,
-      easing: inAndOut,
       sourceResolution: this.view.getResolutionForZoom(this.initialValue.zoom),
       targetResolution: this.view.getResolutionForZoom(
         this.targetValue.zoom || this.initialValue.zoom
@@ -36,7 +34,6 @@ export default class ZoomTo extends MC.Effect {
 
   onProgress(progress /*, millisecond*/) {
     //this has better effect than mc easings
-    progress = this.animation.easing(progress);
     /*
     CHANGE MAP CENTER
     */

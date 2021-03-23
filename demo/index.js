@@ -11,12 +11,12 @@ const bern = MapsDef.utils.fromLonLat([7.4458, 46.95]);
 const map = new Maps.Clip(
   {
     parameters: {
-      view: { center: london, zoom: 8 }
-    }
+      view: { center: london, zoom: 8 },
+    },
   },
   {
     host: document.getElementById("clip"),
-    containerParams: { width: "1280px", height: "720px" }
+    containerParams: { width: "1280px", height: "720px" },
   }
 );
 
@@ -25,11 +25,11 @@ const gotoBern = new Maps.GoTo(
     animatedAttrs: {
       goto: {
         zoom: 3,
-        center: bern
-      }
-    }
+        center: bern,
+      },
+    },
   },
-  { duration: 4000, selector: "!#olmap" }
+  { duration: 4000, selector: "!#olmap", easing: "easeInExpo" }
 );
 
 const gotoMoscow = new Maps.GoTo(
@@ -37,11 +37,11 @@ const gotoMoscow = new Maps.GoTo(
     animatedAttrs: {
       goto: {
         zoom: 8,
-        center: moscow
-      }
-    }
+        center: moscow,
+      },
+    },
   },
-  { duration: 4000, selector: "!#olmap" }
+  { duration: 4000, selector: "!#olmap", easing: "easeInExpo" }
 );
 
 map.addIncident(gotoBern, 0);
