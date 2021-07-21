@@ -120,7 +120,7 @@
     "npm-check-updates": "*",
     "npx": "*",
     "prettier": "2.3.2",
-    "rollup": "2.53.2",
+    "rollup": "2.53.3",
     "rollup-plugin-babel": "4.4.0",
     "rollup-plugin-commonjs": "10.1.0",
     "rollup-plugin-node-resolve": "5.2.0",
