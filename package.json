@@ -119,7 +119,7 @@
     "monorepo": "1.2.2",
     "npm-check-updates": "*",
     "npx": "*",
-    "prettier": "2.3.2",
+    "prettier": "2.4.0",
     "rollup": "2.56.3",
     "rollup-plugin-babel": "4.4.0",
     "rollup-plugin-commonjs": "10.1.0",
