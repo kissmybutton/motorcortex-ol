@@ -1,5 +1,12 @@
 # Changelog
 
+### [2.0.8](https://www.github.com/donkeyclip/motorcortex-ol/compare/v2.0.7...v2.0.8) (2021-09-22)
+
+
+### Bug Fixes
+
+* add json plugin to rollup ([14fc29c](https://www.github.com/donkeyclip/motorcortex-ol/commit/14fc29c6dfca7c134e2c0ab35a217de4d4aff543))
+
 ### 2.0.7 (2021-04-16)
 
 
