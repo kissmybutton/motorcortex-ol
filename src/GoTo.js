@@ -1,4 +1,4 @@
-import MC from "@kissmybutton/motorcortex";
+import MC from "@donkeyclip/motorcortex";
 
 export default class ZoomTo extends MC.Effect {
   onGetContext() {
