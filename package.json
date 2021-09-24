@@ -1,17 +1,17 @@
 {
-  "name": "@kissmybutton/motorcortex-ol",
+  "name": "@donkeyclip/motorcortex-ol",
   "version": "2.0.7",
   "description": "Openlayers map plugin for MotorCortex",
   "main": "dist/motorcortex-ol.cjs.js",
   "module": "dist/motorcortex-ol.esm.js",
-  "browser": "dist/motorcortex-subtitles.umd.js",
+  "browser": "dist/motorcortex-ol.umd.js",
   "files": [
     "dist"
   ],
   "author": "KissMyButton PC (kissmybutton.gr) <opensource@kissmybutton.gr>",
   "repository": {
     "type": "git",
-    "url": "https://github.com/kissmybutton/motorcortex-googlemaps.git"
+    "url": "https://github.com/donkeyclip/motorcortex-ol.git"
   },
   "license": "MIT",
   "engines": {
@@ -27,13 +27,15 @@
     "lint:fix": "npm run concurrently  \"npm run lint:js -- --fix\" \"npm run lint:styles -- --fix\"",
     "build": "npm run build:lib && npm run build:demo",
     "build:lib": "rollup -c",
-    "start": "webpack-dev-server --inline --hot --disableHostCheck --config ./demo/webpack.config.js",
-    "build:demo": "webpack --config ./demo/webpack.config.js",
+    "start": "npm run build:lib && concurrently -c \"cyan.bold,magenta.bold\" \"npm:build:lib -- -w\"  \"npm:start:demo\" ",
+    "start:demo": "webpack serve --config ./demo/webpack.config.js --mode=development --progress ",
+    "build:demo": "webpack --mode=production --config ./demo/webpack.config.js",
     "test": "HERE GOES YOUR TEST TASK",
     "test:prod": "npm run lint",
     "report-coverage": "cat ./coverage/lcov.info | coveralls",
     "commit": "git-cz",
-    "prebuild": "rimraf dist"
+    "prebuild": "rimraf dist",
+    "prepare": "husky install"
   },
   "keywords": [
     "motorcortex",
@@ -41,20 +43,17 @@
     "maps"
   ],
   "lint-staged": {
-    "linters": {
-      "*.json": [
-        "prettier --write",
-        "git add"
-      ],
-      "*.{css,scss}": [
-        "stylelint  \"src/**.css\" \"src/**/*.scss\" --config .stylelintrc.json --fix",
-        "git add"
-      ],
-      "*.{js,jsx}": [
-        "eslint --fix",
-        "git add"
-      ]
-    }
+    "*.{json,md,yml,yaml}": [
+      "prettier --write"
+    ],
+    "*.css": [
+      "prettier --write",
+      "stylelint  \"src/**.css\" --config .stylelintrc.json --fix"
+    ],
+    "*.{js,jsx}": [
+      "prettier --write",
+      "eslint --fix"
+    ]
   },
   "release": {
     "verifyConditions": [
@@ -78,7 +77,7 @@
     "ol": "^6.5.0"
   },
   "peerDependencies": {
-    "@kissmybutton/motorcortex": "^6.3.2"
+    "@donkeyclip/motorcortex": ">= 6.4.1 < 8"
   },
   "devDependencies": {
     "@babel/cli": "7.15.7",
@@ -86,13 +85,14 @@
     "@babel/preset-env": "7.15.6",
     "@commitlint/cli": "7.6.1",
     "@commitlint/config-conventional": "7.6.0",
-    "@kissmybutton/motorcortex": "6.4.3",
-    "@kissmybutton/motorcortex-player": "1.9.4",
+    "@donkeyclip/motorcortex": "7.4.0",
+    "@donkeyclip/motorcortex-player": "2.2.1",
     "@rollup/plugin-json": "4.1.0",
     "@semantic-release/changelog": "3.0.6",
     "@semantic-release/git": "7.0.18",
     "@semantic-release/github": "5.5.8",
     "@semantic-release/npm": "5.3.5",
+    "@size-limit/preset-big-lib": "5.0.4",
     "babel-eslint": "10.1.0",
     "babel-loader": "8.2.2",
     "babel-preset-es2015-node5": "1.2.0",
@@ -112,7 +112,7 @@
     "eslint-plugin-promise": "4.3.1",
     "eslint-plugin-standard": "4.1.0",
     "exports-loader": "2.0.0",
-    "husky": "5.2.0",
+    "husky": "^7.0.0",
     "imports-loader": "2.0.0",
     "json-stringify-safe": "5.0.1",
     "lint-staged": "10.5.4",
@@ -127,22 +127,10 @@
     "rollup-plugin-terser": "7.0.2",
     "semantic-release": "17.4.2",
     "shelljs": "0.8.4",
-    "stylelint": "13.12.0",
-    "stylelint-config-prettier": "4.0.0",
-    "stylelint-config-recommended": "2.2.0",
-    "stylelint-config-recommended-scss": "3.3.0",
-    "stylelint-config-standard": "18.3.0",
-    "stylelint-scss": "3.21.0",
-    "webpack": "4.46.0",
-    "webpack-cli": "3.3.12",
+    "size-limit": "5.0.4",
+    "webpack": "5.53.0",
+    "webpack-cli": "4.8.0",
     "webpack-dev-server": "3.11.2",
     "whatwg-fetch": "3.6.2"
-  },
-  "husky": {
-    "hooks": {
-      "commit-msg": "commitlint -E HUSKY_GIT_PARAMS",
-      "pre-commit": "lint-staged",
-      "pre-push": "npm run test:prod"
-    }
   }
 }

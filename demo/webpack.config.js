@@ -1,26 +1,20 @@
 const path = require("path");
-const webpack = require("webpack");
 
 module.exports = {
-  context: path.resolve(__dirname),
-
-  entry: ["./index.js"],
-
+  entry: "./demo/index.js",
   resolve: {
     extensions: [".js"],
     modules: [path.resolve("./"), "node_modules"],
+    fallback: {
+      fs: false,
+      path: require.resolve("path-browserify"),
+    },
   },
-
   output: {
     filename: "bundle.js",
-    // the output bundle
-
-    path: path.resolve(__dirname, "./" /*"./dist"*/),
+    path: path.resolve(__dirname, "./"),
   },
-
-  devtool: "cheap-module-eval-source-map",
   mode: "development",
-
   module: {
     rules: [
       {
@@ -33,46 +27,17 @@ module.exports = {
         use: ["style-loader", "css-loader"],
       },
       {
-        test: /\.scss$/,
-        use: [
-          {
-            loader: "style-loader",
-            options: { sourceMap: true }, // creates style nodes from JS strings
-          },
-          {
-            loader: "css-loader",
-            options: { sourceMap: true }, // translates CSS into CommonJS
-          },
-          {
-            loader: "sass-loader",
-            options: { sourceMap: true }, // compiles Sass to CSS
-          },
-        ],
+        test: /\.svg$/,
+        loader: "svg-inline-loader",
+      },
+      {
+        test: /\.html$/i,
+        loader: "html-loader",
       },
     ],
   },
-
-  plugins: [
-    new webpack.ProvidePlugin({
-      Promise: "es6-promise",
-      fetch:
-        "imports-loader?this=>global!exports-loader?global.fetch!whatwg-fetch",
-    }),
-
-    new webpack.HotModuleReplacementPlugin(),
-    // enable HMR globally
-
-    new webpack.NamedModulesPlugin(),
-    // prints more readable module names in the browser console on HMR updates
-
-    new webpack.NoEmitOnErrorsPlugin(),
-    // do not emit compiled assets that include errors
-  ],
-  node: {
-    fs: "empty",
-  },
   devServer: {
-    watchContentBase: true, // initiate a page refresh if static content changes
+    watchContentBase: true,
     host: "0.0.0.0",
     port: 8080,
     historyApiFallback: false,

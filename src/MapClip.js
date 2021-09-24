@@ -1,4 +1,4 @@
-import MC from "@kissmybutton/motorcortex";
+import MC from "@donkeyclip/motorcortex";
 import Map from "ol/Map";
 import View from "ol/View";
 import Tile from "ol/layer/Tile";
