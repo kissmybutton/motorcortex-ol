@@ -3,6 +3,7 @@
 [Openlayers](https://openlayers.org/) library as a MotorCortex Incident
 
 ## Installation
+
 ```bash
 $ npm install @donkeyclip/motorcortex-ol
 # OR
@@ -13,14 +14,15 @@ $ yarn add @donkeyclip/motorcortex-ol
 import Openlayers from "@donkeyclip/motorcortex-ol";
 ```
 
-
 ## Key Concepts / Features
+
 MotorCortex Openlayers takes the capabilities of Openlayers library of creating a dynamic map in any web page.
 The library exposes a Map Clip with the name Clip which will initialize an Openlayer Map instance where you can add animation with the "GoTo" Incident.
 
-
 ## Documentation
+
 ### Import and load the plugin to MotorCortex
+
 ```javascript
 import MC from "@donkeyclip/motorcortex";
 import MapsDef from "@donkeyclip/motorcortex-ol";
@@ -33,12 +35,12 @@ const bern = MapsDef.utils.fromLonLat([7.4458, 46.95]);
 const clip = new Maps.Clip(
   {
     parameters: {
-      view: { center: london, zoom: 8 }
-    }
+      view: { center: london, zoom: 8 },
+    },
   },
   {
     host: document.getElementById("clip"),
-    containerParams: { width: "1280px", height: "720px" }
+    containerParams: { width: "1280px", height: "720px" },
   }
 );
 
@@ -47,24 +49,23 @@ const gotoBern = new Maps.GoTo(
     animatedAttrs: {
       goto: {
         zoom: 3,
-        center: bern
-      }
-    }
+        center: bern,
+      },
+    },
   },
   { duration: 4000, selector: "!#olmap" }
 );
 
 clip.addIncident(gotoBern, 0);
-clip.play()
+clip.play();
 ```
 
 ### Demo
-https://kissmybutton.github.io/motorcortex-ol/demo/
 
+https://donkeyclip.github.io/motorcortex-ol/demo/
 
 ## License
+
 [MIT License](https://opensource.org/licenses/MIT)
 
-  
-  
-[![Kiss My Button](https://presskit.kissmybutton.gr/logos/kissmybutton-logo-small.png)](https://kissmybutton.gr)
+[<img src="https://presskit.donkeyclip.com/logos/donkey%20clip%20logo.svg" width=250></img>](https://donkeyclip.com)
