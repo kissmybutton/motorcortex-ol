@@ -1,8 +1,8 @@
-import MC from "@kissmybutton/motorcortex";
-import Player from "@kissmybutton/motorcortex-player";
+import { loadPlugin } from "@donkeyclip/motorcortex";
+import Player from "@donkeyclip/motorcortex-player";
 import MapsDef from "../src/";
 
-const Maps = MC.loadPlugin(MapsDef);
+const Maps = loadPlugin(MapsDef);
 
 const london = MapsDef.utils.fromLonLat([-0.12755, 51.507222]);
 const moscow = MapsDef.utils.fromLonLat([37.6178, 55.7517]);
@@ -46,4 +46,4 @@ const gotoMoscow = new Maps.GoTo(
 
 map.addIncident(gotoBern, 0);
 map.addIncident(gotoMoscow, 4000);
-new Player({ clip: map, theme: "mc-blue", preview: true });
+new Player({ clip: map, theme: "blue" });

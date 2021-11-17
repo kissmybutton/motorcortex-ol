@@ -1,6 +1,6 @@
-import MC from "@kissmybutton/motorcortex";
+import { Effect } from "@donkeyclip/motorcortex";
 
-export default class ZoomTo extends MC.Effect {
+export default class ZoomTo extends Effect {
   onGetContext() {
     //initialize the animation object
     this.view = this.element.entity.getView();

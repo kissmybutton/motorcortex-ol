@@ -1,27 +1,28 @@
-import babel from "rollup-plugin-babel";
-import commonjs from "rollup-plugin-commonjs";
-import resolve from "rollup-plugin-node-resolve";
+import babel from "@rollup/plugin-babel";
+import commonjs from "@rollup/plugin-commonjs";
+import json from "@rollup/plugin-json";
+import resolve from "@rollup/plugin-node-resolve";
 import { terser } from "rollup-plugin-terser";
 import pkg from "./package.json";
-import json from "@rollup/plugin-json";
 
 export default [
   {
     input: "src/index.js",
-    external: ["@kissmybutton/motorcortex"],
+    external: ["@donkeyclip/motorcortex"],
     output: [
-      { file: pkg.main, format: "cjs" },
-      { file: pkg.module, format: "es" },
+      { dir: pkg.main, format: "cjs" },
+      { dir: pkg.module, format: "es" },
     ],
-    plugins: [resolve(), babel(), commonjs(), terser(), json()],
+    plugins: [resolve(), commonjs(), babel(), json()],
   },
   {
     input: "src/index.js",
-    external: ["@kissmybutton/motorcortex"],
+    external: ["@donkeyclip/motorcortex"],
     output: [
       {
+        inlineDynamicImports: true,
         globals: {
-          "@kissmybutton/motorcortex": "MotorCortex",
+          "@donkeyclip/motorcortex": "MotorCortex",
         },
         name: pkg.name,
         file: pkg.browser,
@@ -29,11 +30,11 @@ export default [
       },
     ],
     plugins: [
+      json(),
       resolve({ mainFields: ["module", "main", "browser"] }),
       commonjs(),
       babel(),
       terser(),
-      json(),
     ],
   },
 ];
