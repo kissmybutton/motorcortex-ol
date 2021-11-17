@@ -1,5 +1,20 @@
 # Changelog
 
+### [2.0.9](https://www.github.com/donkeyclip/motorcortex-ol/compare/v2.0.8...v2.0.9) (2021-11-17)
+
+
+### Bug Fixes
+
+* drop code from demo config ([8a5db3e](https://www.github.com/donkeyclip/motorcortex-ol/commit/8a5db3e8a277cedb4d7abb54602571027020c224))
+* fix broken config ([8235501](https://www.github.com/donkeyclip/motorcortex-ol/commit/8235501b5c54199daba0d2389e167b92c783ec9d))
+* fix broken webpack config ([991e7f3](https://www.github.com/donkeyclip/motorcortex-ol/commit/991e7f3e4608b0df5d65e1b6d15e28a346068c77))
+* update build and demo files drop old babel config ([3494e3d](https://www.github.com/donkeyclip/motorcortex-ol/commit/3494e3dc2e49282c2b9ba953729f2692f8ed3362))
+* update build and demo files drop old babel config ([1126d10](https://www.github.com/donkeyclip/motorcortex-ol/commit/1126d102fe49082adea3bcb60eb0bb1f9444b3dd))
+* update build and demo files drop old babel config ([ea05fae](https://www.github.com/donkeyclip/motorcortex-ol/commit/ea05faed992aa20c0cd7758630dc2016788c4e4f))
+* update build and demo files drop old babel config ([7400661](https://www.github.com/donkeyclip/motorcortex-ol/commit/7400661f6fcb0647e269493d0d896f6504816716))
+* update deps ([e3849d4](https://www.github.com/donkeyclip/motorcortex-ol/commit/e3849d40538fce2105d57de7f05060edfff75e46))
+* update rollup deps to latest packages ([508125d](https://www.github.com/donkeyclip/motorcortex-ol/commit/508125de2e3ce1f7c94942fd0efe61f8b1c39623))
+
 ### [2.0.8](https://www.github.com/donkeyclip/motorcortex-ol/compare/v2.0.7...v2.0.8) (2021-09-24)
 
 
