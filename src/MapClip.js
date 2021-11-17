@@ -1,10 +1,10 @@
-import MC from "@donkeyclip/motorcortex";
+import { BrowserClip } from "@donkeyclip/motorcortex";
 import Map from "ol/Map";
 import View from "ol/View";
 import Tile from "ol/layer/Tile";
 import OSM from "ol/source/OSM";
 
-export default class olMap extends MC.BrowserClip {
+export default class olMap extends BrowserClip {
   onAfterRender() {
     const olMap = new Map({
       target: this.context.rootElement,

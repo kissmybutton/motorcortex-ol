@@ -1,11 +1,11 @@
 import Clip from "./MapClip";
 import GoTo from "./GoTo";
 import { fromLonLat } from "ol/proj.js";
-import { name, version } from "../package.json";
+import packageJSON from "../package.json";
 
 export default {
-  npm_name: name, // don't touch this
-  version: version, // don't touch this
+  npm_name: packageJSON.name, // don't touch this
+  version: packageJSON.version, // don't touch this
   incidents: [
     {
       exportable: GoTo,
