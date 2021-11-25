@@ -25202,7 +25202,7 @@ var devDependencies = {
 	uuid: "8.3.2",
 	webpack: "5.64.4",
 	"webpack-cli": "4.9.1",
-	"webpack-dev-server": "4.5.0"
+	"webpack-dev-server": "4.6.0"
 };
 var packageJSON = {
 	name: name,
