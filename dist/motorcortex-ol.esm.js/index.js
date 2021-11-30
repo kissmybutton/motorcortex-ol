@@ -25191,7 +25191,7 @@ var devDependencies = {
 	"path-browserify": "1.0.1",
 	prettier: "2.5.0",
 	rimraf: "3.0.2",
-	rollup: "2.60.1",
+	rollup: "2.60.2",
 	"rollup-plugin-babel": "4.4.0",
 	"rollup-plugin-cleanup": "3.2.1",
 	"rollup-plugin-commonjs": "10.1.0",
