@@ -19,6 +19,9 @@ function _defineProperties(target, props) {
 function _createClass(Constructor, protoProps, staticProps) {
   if (protoProps) _defineProperties(Constructor.prototype, protoProps);
   if (staticProps) _defineProperties(Constructor, staticProps);
+  Object.defineProperty(Constructor, "prototype", {
+    writable: false
+  });
   return Constructor;
 }
 
@@ -27,12 +30,15 @@ function _inherits(subClass, superClass) {
     throw new TypeError("Super expression must either be null or a function");
   }
 
-  subClass.prototype = Object.create(superClass && superClass.prototype, {
-    constructor: {
-      value: subClass,
-      writable: true,
-      configurable: true
-    }
+  Object.defineProperty(subClass, "prototype", {
+    value: Object.create(superClass && superClass.prototype, {
+      constructor: {
+        value: subClass,
+        writable: true,
+        configurable: true
+      }
+    }),
+    writable: false
   });
   if (superClass) _setPrototypeOf(subClass, superClass);
 }
@@ -25151,12 +25157,12 @@ var peerDependencies = {
 };
 var devDependencies = {
 	"@babel/cli": "7.16.0",
-	"@babel/core": "7.16.0",
-	"@babel/eslint-parser": "7.16.3",
-	"@babel/plugin-proposal-nullish-coalescing-operator": "7.16.0",
-	"@babel/plugin-syntax-jsx": "7.16.0",
-	"@babel/plugin-transform-react-jsx": "7.16.0",
-	"@babel/preset-env": "7.16.4",
+	"@babel/core": "7.16.5",
+	"@babel/eslint-parser": "7.16.5",
+	"@babel/plugin-proposal-nullish-coalescing-operator": "7.16.5",
+	"@babel/plugin-syntax-jsx": "7.16.5",
+	"@babel/plugin-transform-react-jsx": "7.16.5",
+	"@babel/preset-env": "7.16.5",
 	"@commitlint/cli": "13.2.1",
 	"@commitlint/config-conventional": "13.2.0",
 	"@donkeyclip/motorcortex": "7.6.6",
