@@ -25180,7 +25180,7 @@ var devDependencies = {
 	browserslist: "4.19.1",
 	"caniuse-lite": "1.0.30001287",
 	commitizen: "4.2.4",
-	concurrently: "6.5.0",
+	concurrently: "6.5.1",
 	"core-js": "3.20.0",
 	"css-loader": "6.5.1",
 	"cz-conventional-changelog": "3.3.0",
