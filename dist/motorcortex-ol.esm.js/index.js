@@ -25208,7 +25208,7 @@ var devDependencies = {
 	uuid: "8.3.2",
 	webpack: "5.65.0",
 	"webpack-cli": "4.9.1",
-	"webpack-dev-server": "4.7.0"
+	"webpack-dev-server": "4.7.1"
 };
 var packageJSON = {
 	name: name,
