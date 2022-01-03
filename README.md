@@ -4,13 +4,13 @@
 
 ## Installation
 ```bash
-$ npm install @kissmybutton/motorcortex-ol
+$ npm install @donkeyclip/motorcortex-ol
 # OR
-$ yarn add @kissmybutton/motorcortex-ol
+$ yarn add @donkeyclip/motorcortex-ol
 ```
 
 ```javascript
-import Openlayers from "@kissmybutton/motorcortex-ol";
+import Openlayers from "@donkeyclip/motorcortex-ol";
 ```
 
 
@@ -22,8 +22,8 @@ The library exposes a Map Clip with the name Clip which will initialize an Openl
 ## Documentation
 ### Import and load the plugin to MotorCortex
 ```javascript
-import MC from "@kissmybutton/motorcortex";
-import MapsDef from "@kissmybutton/motorcortex-ol";
+import MC from "@donkeyclip/motorcortex";
+import MapsDef from "@donkeyclip/motorcortex-ol";
 
 const Maps = MC.loadPlugin(MapsDef);
 
@@ -59,12 +59,11 @@ clip.play()
 ```
 
 ### Demo
-https://kissmybutton.github.io/motorcortex-ol/demo/
+https://donkeyclip.github.io/motorcortex-ol/demo/
 
 
 ## License
 [MIT License](https://opensource.org/licenses/MIT)
 
-  
-  
-[![Kiss My Button](https://presskit.kissmybutton.gr/logos/kissmybutton-logo-small.png)](https://kissmybutton.gr)
+[<img src="https://presskit.donkeyclip.com/logos/donkey%20clip%20logo.svg" width=250></img>](https://donkeyclip.com)
+
