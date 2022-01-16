@@ -2,7 +2,7 @@
 
 **Table of Contents**
 
-- [MotorMortex-Openlayers](#motorcortex-openlayers)
+- [MotorCortex-Openlayers](#motorcortex-openlayers)
   - [Demo](#demo)
 - [Intro / Features](#intro--features)
 - [Getting Started](#getting-started)
