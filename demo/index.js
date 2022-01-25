@@ -46,4 +46,4 @@ const gotoMoscow = new Maps.GoTo(
 
 map.addIncident(gotoBern, 0);
 map.addIncident(gotoMoscow, 4000);
-new Player({ clip: map, theme: "blue" });
+new Player({ clip: map });
