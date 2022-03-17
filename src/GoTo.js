@@ -32,7 +32,7 @@ export default class ZoomTo extends Effect {
     return _goto;
   }
 
-  onProgress(progress /*, millisecond*/) {
+  onProgress(millisecond /*, millisecond*/) {
     //this has better effect than mc easings
     /*
     CHANGE MAP CENTER
@@ -41,8 +41,8 @@ export default class ZoomTo extends Effect {
     const y0 = this.animation.sourceCenter[1];
     const x1 = this.animation.targetCenter[0];
     const y1 = this.animation.targetCenter[1];
-    const x = x0 + progress * (x1 - x0);
-    const y = y0 + progress * (y1 - y0);
+    const x = x0 + this.getFraction(millisecond) * (x1 - x0);
+    const y = y0 + this.getFraction(millisecond) * (y1 - y0);
 
     this.view.setCenter([x, y]);
 
@@ -50,10 +50,10 @@ export default class ZoomTo extends Effect {
     CHANGE MAP RESOLUTION
     */
     const resolution =
-      progress === 1
+      this.getFraction(millisecond) === 1
         ? this.animation.targetResolution
         : this.animation.sourceResolution +
-          progress *
+          this.getFraction(millisecond) *
             (this.animation.targetResolution - this.animation.sourceResolution);
     if (this.animation.anchor) {
       this.view.setCenter(
@@ -66,10 +66,10 @@ export default class ZoomTo extends Effect {
     CHANGE MAP ROTATION
     */
     const rotation =
-      progress === 1
+      this.getFraction(millisecond) === 1
         ? ((this.animation.targetRotation + Math.PI) % (2 * Math.PI)) - Math.PI
         : this.animation.sourceRotation +
-          progress *
+          this.getFraction(millisecond) *
             (this.animation.targetRotation - this.animation.sourceRotation);
     if (this.animation.anchor) {
       this.view.setCenter(

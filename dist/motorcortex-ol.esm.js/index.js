@@ -25051,7 +25051,7 @@ var ZoomTo = /*#__PURE__*/function (_Effect) {
     }
   }, {
     key: "onProgress",
-    value: function onProgress(progress
+    value: function onProgress(millisecond
     /*, millisecond*/
     ) {
       //this has better effect than mc easings
@@ -25063,14 +25063,14 @@ var ZoomTo = /*#__PURE__*/function (_Effect) {
       var y0 = this.animation.sourceCenter[1];
       var x1 = this.animation.targetCenter[0];
       var y1 = this.animation.targetCenter[1];
-      var x = x0 + progress * (x1 - x0);
-      var y = y0 + progress * (y1 - y0);
+      var x = x0 + this.getFraction(millisecond) * (x1 - x0);
+      var y = y0 + this.getFraction(millisecond) * (y1 - y0);
       this.view.setCenter([x, y]);
       /*
       CHANGE MAP RESOLUTION
       */
 
-      var resolution = progress === 1 ? this.animation.targetResolution : this.animation.sourceResolution + progress * (this.animation.targetResolution - this.animation.sourceResolution);
+      var resolution = this.getFraction(millisecond) === 1 ? this.animation.targetResolution : this.animation.sourceResolution + this.getFraction(millisecond) * (this.animation.targetResolution - this.animation.sourceResolution);
 
       if (this.animation.anchor) {
         this.view.setCenter(this.view.calculateCenterZoom(resolution, this.animation.anchor));
@@ -25081,7 +25081,7 @@ var ZoomTo = /*#__PURE__*/function (_Effect) {
       CHANGE MAP ROTATION
       */
 
-      var rotation = progress === 1 ? (this.animation.targetRotation + Math.PI) % (2 * Math.PI) - Math.PI : this.animation.sourceRotation + progress * (this.animation.targetRotation - this.animation.sourceRotation);
+      var rotation = this.getFraction(millisecond) === 1 ? (this.animation.targetRotation + Math.PI) % (2 * Math.PI) - Math.PI : this.animation.sourceRotation + this.getFraction(millisecond) * (this.animation.targetRotation - this.animation.sourceRotation);
 
       if (this.animation.anchor) {
         this.view.setCenter(this.view.calculateCenterRotate(rotation, this.animation.anchor));
@@ -25153,7 +25153,7 @@ var dependencies = {
 	ol: "^6.5.0"
 };
 var peerDependencies = {
-	"@donkeyclip/motorcortex": ">= 7.5.4 < 8"
+	"@donkeyclip/motorcortex": ">= 8 < 9"
 };
 var devDependencies = {
 	"@babel/cli": "7.16.8",
@@ -25165,8 +25165,8 @@ var devDependencies = {
 	"@babel/preset-env": "7.16.8",
 	"@commitlint/cli": "13.2.1",
 	"@commitlint/config-conventional": "13.2.0",
-	"@donkeyclip/motorcortex": "7.6.6",
-	"@donkeyclip/motorcortex-player": "2.4.4",
+	"@donkeyclip/motorcortex": "8.0.0",
+	"@donkeyclip/motorcortex-player": "2.5.2",
 	"@rollup/plugin-babel": "5.3.0",
 	"@rollup/plugin-commonjs": "21.0.1",
 	"@rollup/plugin-json": "4.1.0",
