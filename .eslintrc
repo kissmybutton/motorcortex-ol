@@ -1,14 +1,19 @@
 {
   "parser": "babel-eslint",
-  "extends": ["eslint:recommended", "prettier"],
-  "plugins": ["babel", "prettier"],
+  "extends": [
+    "eslint:recommended",
+    "prettier"
+  ],
+  "plugins": [
+    "babel",
+    "prettier"
+  ],
   "env": {
     "browser": true,
     "node": true
   },
   "globals": {
     "Promise": false,
-    "THREE": false,
     "document": false,
     "escape": false,
     "navigator": false,
@@ -21,13 +26,25 @@
     "sinon": true
   },
   "rules": {
-    "prettier/prettier": ["error"],
-    "linebreak-style": ["error", "unix"],
-    "semi": ["error", "always"],
+    "prettier/prettier": [
+      "error"
+    ],
+    "linebreak-style": [
+      "error",
+      "unix"
+    ],
+    "semi": [
+      "error",
+      "always"
+    ],
     "no-console": [
       "error",
       {
-        "allow": ["warn", "error", "info"]
+        "allow": [
+          "warn",
+          "error",
+          "info"
+        ]
       }
     ],
     "prefer-promise-reject-errors": "error",
