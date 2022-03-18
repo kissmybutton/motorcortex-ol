@@ -4,13 +4,13 @@ import View from "ol/View";
 import Tile from "ol/layer/Tile";
 import OSM from "ol/source/OSM";
 
-export default class olMap extends BrowserClip {
+export default class OlMap extends BrowserClip {
   onAfterRender() {
     const olMap = new Map({
       target: this.context.rootElement,
       layers: [
         new Tile({
-          preload: 4,
+          preload: 10,
           source: new OSM(),
         }),
       ],

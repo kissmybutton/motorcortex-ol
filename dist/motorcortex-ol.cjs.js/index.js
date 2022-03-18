@@ -24983,36 +24983,35 @@ function (_super) {
 
 var OSM$1 = OSM;
 
-var olMap = /*#__PURE__*/function (_BrowserClip) {
-  _inherits(olMap, _BrowserClip);
+var OlMap = /*#__PURE__*/function (_BrowserClip) {
+  _inherits(OlMap, _BrowserClip);
 
-  var _super = _createSuper(olMap);
+  var _super = _createSuper(OlMap);
 
-  function olMap() {
-    _classCallCheck(this, olMap);
+  function OlMap() {
+    _classCallCheck(this, OlMap);
 
     return _super.apply(this, arguments);
   }
 
-  _createClass(olMap, [{
+  _createClass(OlMap, [{
     key: "onAfterRender",
     value: function onAfterRender() {
-      var _olMap = new Map$1({
+      var olMap = new Map$1({
         target: this.context.rootElement,
         layers: [new Tile$2({
-          preload: 4,
+          preload: 10,
           source: new OSM$1()
         })],
         controls: [],
         loadTilesWhileAnimating: true,
         view: new View$1(this.attrs.parameters.view)
       });
-
-      this.setCustomEntity("olmap", _olMap, ["maps"]);
+      this.setCustomEntity("olmap", olMap, ["maps"]);
     }
   }]);
 
-  return olMap;
+  return OlMap;
 }(motorcortex.BrowserClip);
 
 var ZoomTo = /*#__PURE__*/function (_Effect) {
@@ -25276,7 +25275,7 @@ var index = {
   compositeAttributes: {
     "goto": ["center", "zoom"]
   },
-  Clip: olMap,
+  Clip: OlMap,
   utils: {
     fromLonLat: fromLonLat
   }
