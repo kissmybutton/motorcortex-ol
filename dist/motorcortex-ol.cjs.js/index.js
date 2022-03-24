@@ -25869,7 +25869,7 @@ var ZoomTo = /*#__PURE__*/function (_Effect) {
 }(motorcortex.Effect);
 
 var name = "@donkeyclip/motorcortex-ol";
-var version = "2.0.8";
+var version = "3.0.0";
 var description = "Openlayers library for MotorCortex";
 var main = "dist/motorcortex-ol.cjs.js";
 var module$1 = "dist/motorcortex-ol.esm.js";
