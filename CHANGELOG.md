@@ -1,5 +1,12 @@
 # Changelog
 
+### [3.0.1](https://github.com/donkeyclip/motorcortex-ol/compare/v3.0.0...v3.0.1) (2022-03-25)
+
+
+### Bug Fixes
+
+* upgrade mc to latest version ([e10d27c](https://github.com/donkeyclip/motorcortex-ol/commit/e10d27cc915438e1f06851507df52a0aaa236d73))
+
 ## [3.0.0](https://github.com/donkeyclip/motorcortex-ol/compare/v2.0.8...v3.0.0) (2022-03-24)
 
 
