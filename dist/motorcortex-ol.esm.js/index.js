@@ -25946,7 +25946,7 @@ var devDependencies = {
 	"rollup-plugin-terser": "7.0.2",
 	"style-loader": "3.3.1",
 	tslib: "^2.3.1",
-	webpack: "^5.70.0",
+	webpack: "5.71.0",
 	"webpack-cli": "^4.9.2",
 	"webpack-dev-server": "^4.7.4"
 };
