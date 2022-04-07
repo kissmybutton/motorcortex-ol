@@ -25728,7 +25728,7 @@ class ZoomTo extends Effect {
 }
 
 var name = "@donkeyclip/motorcortex-ol";
-var version = "3.0.1";
+var version = "3.1.0";
 var description = "Openlayers library for MotorCortex";
 var main = "dist/motorcortex-ol.cjs.js";
 var module = "dist/motorcortex-ol.esm.js";
