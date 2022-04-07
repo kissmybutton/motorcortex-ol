@@ -25768,7 +25768,7 @@ var dependencies = {
 	ol: "^6.13.0"
 };
 var peerDependencies = {
-	"@donkeyclip/motorcortex": ">= 8 < 9"
+	"@donkeyclip/motorcortex": ">= 8 < 10"
 };
 var devDependencies = {
 	"@babel/cli": "^7.17.6",
