@@ -2,115 +2,6 @@
 
 var motorcortex = require('@donkeyclip/motorcortex');
 
-function _classCallCheck(instance, Constructor) {
-  if (!(instance instanceof Constructor)) {
-    throw new TypeError("Cannot call a class as a function");
-  }
-}
-
-function _defineProperties(target, props) {
-  for (var i = 0; i < props.length; i++) {
-    var descriptor = props[i];
-    descriptor.enumerable = descriptor.enumerable || false;
-    descriptor.configurable = true;
-    if ("value" in descriptor) descriptor.writable = true;
-    Object.defineProperty(target, descriptor.key, descriptor);
-  }
-}
-
-function _createClass(Constructor, protoProps, staticProps) {
-  if (protoProps) _defineProperties(Constructor.prototype, protoProps);
-  if (staticProps) _defineProperties(Constructor, staticProps);
-  Object.defineProperty(Constructor, "prototype", {
-    writable: false
-  });
-  return Constructor;
-}
-
-function _inherits(subClass, superClass) {
-  if (typeof superClass !== "function" && superClass !== null) {
-    throw new TypeError("Super expression must either be null or a function");
-  }
-
-  subClass.prototype = Object.create(superClass && superClass.prototype, {
-    constructor: {
-      value: subClass,
-      writable: true,
-      configurable: true
-    }
-  });
-  Object.defineProperty(subClass, "prototype", {
-    writable: false
-  });
-  if (superClass) _setPrototypeOf(subClass, superClass);
-}
-
-function _getPrototypeOf(o) {
-  _getPrototypeOf = Object.setPrototypeOf ? Object.getPrototypeOf : function _getPrototypeOf(o) {
-    return o.__proto__ || Object.getPrototypeOf(o);
-  };
-  return _getPrototypeOf(o);
-}
-
-function _setPrototypeOf(o, p) {
-  _setPrototypeOf = Object.setPrototypeOf || function _setPrototypeOf(o, p) {
-    o.__proto__ = p;
-    return o;
-  };
-
-  return _setPrototypeOf(o, p);
-}
-
-function _isNativeReflectConstruct() {
-  if (typeof Reflect === "undefined" || !Reflect.construct) return false;
-  if (Reflect.construct.sham) return false;
-  if (typeof Proxy === "function") return true;
-
-  try {
-    Boolean.prototype.valueOf.call(Reflect.construct(Boolean, [], function () {}));
-    return true;
-  } catch (e) {
-    return false;
-  }
-}
-
-function _assertThisInitialized(self) {
-  if (self === void 0) {
-    throw new ReferenceError("this hasn't been initialised - super() hasn't been called");
-  }
-
-  return self;
-}
-
-function _possibleConstructorReturn(self, call) {
-  if (call && (typeof call === "object" || typeof call === "function")) {
-    return call;
-  } else if (call !== void 0) {
-    throw new TypeError("Derived constructors may only return object or undefined");
-  }
-
-  return _assertThisInitialized(self);
-}
-
-function _createSuper(Derived) {
-  var hasNativeReflectConstruct = _isNativeReflectConstruct();
-
-  return function _createSuperInternal() {
-    var Super = _getPrototypeOf(Derived),
-        result;
-
-    if (hasNativeReflectConstruct) {
-      var NewTarget = _getPrototypeOf(this).constructor;
-
-      result = Reflect.construct(Super, arguments, NewTarget);
-    } else {
-      result = Super.apply(this, arguments);
-    }
-
-    return _possibleConstructorReturn(this, result);
-  };
-}
-
 /**
  * @module ol/Disposable
  */
@@ -25756,117 +25647,87 @@ function (_super) {
 
 var OSM$1 = OSM;
 
-var OlMap = /*#__PURE__*/function (_BrowserClip) {
-  _inherits(OlMap, _BrowserClip);
-
-  var _super = _createSuper(OlMap);
-
-  function OlMap() {
-    _classCallCheck(this, OlMap);
-
-    return _super.apply(this, arguments);
+class OlMap extends motorcortex.BrowserClip {
+  onAfterRender() {
+    const olMap = new Map$1({
+      target: this.context.rootElement,
+      layers: [new Tile({
+        preload: 10,
+        source: new OSM$1()
+      })],
+      controls: [],
+      loadTilesWhileAnimating: true,
+      view: new View$1(this.attrs.parameters.view)
+    });
+    this.setCustomEntity("olmap", olMap, ["maps"]);
   }
 
-  _createClass(OlMap, [{
-    key: "onAfterRender",
-    value: function onAfterRender() {
-      var olMap = new Map$1({
-        target: this.context.rootElement,
-        layers: [new Tile({
-          preload: 10,
-          source: new OSM$1()
-        })],
-        controls: [],
-        loadTilesWhileAnimating: true,
-        view: new View$1(this.attrs.parameters.view)
-      });
-      this.setCustomEntity("olmap", olMap, ["maps"]);
-    }
-  }]);
+}
 
-  return OlMap;
-}(motorcortex.BrowserClip);
-
-var ZoomTo = /*#__PURE__*/function (_Effect) {
-  _inherits(ZoomTo, _Effect);
-
-  var _super = _createSuper(ZoomTo);
-
-  function ZoomTo() {
-    _classCallCheck(this, ZoomTo);
-
-    return _super.apply(this, arguments);
+class ZoomTo extends motorcortex.Effect {
+  onGetContext() {
+    //initialize the animation object
+    this.view = this.element.entity.getView();
+    this.animation = {
+      anchor: this.targetValue.anchor,
+      sourceResolution: this.view.getResolutionForZoom(this.initialValue.zoom),
+      targetResolution: this.view.getResolutionForZoom(this.targetValue.zoom || this.initialValue.zoom),
+      sourceCenter: this.initialValue.center,
+      targetCenter: this.targetValue.center || this.initialValue.center,
+      sourceRotation: this.initialValue.rotation,
+      targetRotation: this.targetValue.rotation ? this.initialValue.rotation + (this.targetValue.rotation - this.initialValue.rotation + Math.PI) % (2 * Math.PI) - Math.PI : this.initialValue.rotation
+    };
   }
 
-  _createClass(ZoomTo, [{
-    key: "onGetContext",
-    value: function onGetContext() {
-      //initialize the animation object
-      this.view = this.element.entity.getView();
-      this.animation = {
-        anchor: this.targetValue.anchor,
-        sourceResolution: this.view.getResolutionForZoom(this.initialValue.zoom),
-        targetResolution: this.view.getResolutionForZoom(this.targetValue.zoom || this.initialValue.zoom),
-        sourceCenter: this.initialValue.center,
-        targetCenter: this.targetValue.center || this.initialValue.center,
-        sourceRotation: this.initialValue.rotation,
-        targetRotation: this.targetValue.rotation ? this.initialValue.rotation + (this.targetValue.rotation - this.initialValue.rotation + Math.PI) % (2 * Math.PI) - Math.PI : this.initialValue.rotation
-      };
+  getScratchValue() {
+    const view = this.element.entity.getView();
+    return {
+      zoom: view.getZoom(),
+      center: view.getCenter(),
+      rotation: view.getRotation()
+    };
+  }
+
+  onProgress(millisecond) {
+    const fraction = this.getFraction(millisecond); //this has better effect than mc easings
+
+    /*
+    CHANGE MAP CENTER
+    */
+
+    const animation = this.animation;
+    const x0 = animation.sourceCenter[0];
+    const y0 = animation.sourceCenter[1];
+    const x1 = animation.targetCenter[0];
+    const y1 = animation.targetCenter[1];
+    const x = x0 + fraction * (x1 - x0);
+    const y = y0 + fraction * (y1 - y0);
+    this.view.setCenter([x, y]);
+    /*
+    CHANGE MAP RESOLUTION
+    */
+
+    const resolution = fraction === 1 ? animation.targetResolution : animation.sourceResolution + fraction * (animation.targetResolution - animation.sourceResolution);
+
+    if (animation.anchor) {
+      this.view.setCenter(this.view.calculateCenterZoom(resolution, animation.anchor));
     }
-  }, {
-    key: "getScratchValue",
-    value: function getScratchValue() {
-      var view = this.element.entity.getView();
-      return {
-        zoom: view.getZoom(),
-        center: view.getCenter(),
-        rotation: view.getRotation()
-      };
+
+    this.view.setResolution(resolution);
+    /*
+    CHANGE MAP ROTATION
+    */
+
+    const rotation = fraction === 1 ? (animation.targetRotation + Math.PI) % (2 * Math.PI) - Math.PI : animation.sourceRotation + fraction * (animation.targetRotation - animation.sourceRotation);
+
+    if (animation.anchor) {
+      this.view.setCenter(this.view.calculateCenterRotate(rotation, animation.anchor));
     }
-  }, {
-    key: "onProgress",
-    value: function onProgress(millisecond) {
-      var fraction = this.getFraction(millisecond); //this has better effect than mc easings
 
-      /*
-      CHANGE MAP CENTER
-      */
+    this.view.setRotation(rotation);
+  }
 
-      var animation = this.animation;
-      var x0 = animation.sourceCenter[0];
-      var y0 = animation.sourceCenter[1];
-      var x1 = animation.targetCenter[0];
-      var y1 = animation.targetCenter[1];
-      var x = x0 + fraction * (x1 - x0);
-      var y = y0 + fraction * (y1 - y0);
-      this.view.setCenter([x, y]);
-      /*
-      CHANGE MAP RESOLUTION
-      */
-
-      var resolution = fraction === 1 ? animation.targetResolution : animation.sourceResolution + fraction * (animation.targetResolution - animation.sourceResolution);
-
-      if (animation.anchor) {
-        this.view.setCenter(this.view.calculateCenterZoom(resolution, animation.anchor));
-      }
-
-      this.view.setResolution(resolution);
-      /*
-      CHANGE MAP ROTATION
-      */
-
-      var rotation = fraction === 1 ? (animation.targetRotation + Math.PI) % (2 * Math.PI) - Math.PI : animation.sourceRotation + fraction * (animation.targetRotation - animation.sourceRotation);
-
-      if (animation.anchor) {
-        this.view.setCenter(this.view.calculateCenterRotate(rotation, animation.anchor));
-      }
-
-      this.view.setRotation(rotation);
-    }
-  }]);
-
-  return ZoomTo;
-}(motorcortex.Effect);
+}
 
 var name = "@donkeyclip/motorcortex-ol";
 var version = "3.0.1";
@@ -25992,7 +25853,7 @@ var index = {
       animatedAttrs: {
         type: "object",
         props: {
-          "goto": {
+          goto: {
             type: "object",
             props: {
               zoom: {
@@ -26012,11 +25873,11 @@ var index = {
     }
   }],
   compositeAttributes: {
-    "goto": ["center", "zoom"]
+    goto: ["center", "zoom"]
   },
   Clip: OlMap,
   utils: {
-    fromLonLat: fromLonLat
+    fromLonLat
   }
 };
 
