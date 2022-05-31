@@ -25809,7 +25809,7 @@ var devDependencies = {
 	tslib: "2.4.0",
 	webpack: "5.72.1",
 	"webpack-cli": "^4.9.2",
-	"webpack-dev-server": "4.9.0"
+	"webpack-dev-server": "4.9.1"
 };
 var packageJSON = {
 	name: name,
