@@ -25800,7 +25800,7 @@ var devDependencies = {
 	"lint-staged": "12.5.0",
 	prettier: "2.6.2",
 	rimraf: "3.0.2",
-	rollup: "2.75.4",
+	rollup: "2.75.5",
 	"rollup-plugin-babel": "4.4.0",
 	"rollup-plugin-cleanup": "3.2.1",
 	"rollup-plugin-commonjs": "10.1.0",
