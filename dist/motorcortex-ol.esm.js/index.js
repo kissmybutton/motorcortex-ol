@@ -49317,7 +49317,7 @@ var devDependencies = {
 	"style-loader": "3.3.1",
 	tslib: "2.4.0",
 	webpack: "5.73.0",
-	"webpack-cli": "^4.9.2",
+	"webpack-cli": "4.10.0",
 	"webpack-dev-server": "4.9.2"
 };
 var packageJSON = {
