@@ -49320,7 +49320,7 @@ var devDependencies = {
 	tslib: "2.4.0",
 	webpack: "5.74.0",
 	"webpack-cli": "4.10.0",
-	"webpack-dev-server": "4.9.3"
+	"webpack-dev-server": "4.10.0"
 };
 var packageJSON = {
 	name: name,
