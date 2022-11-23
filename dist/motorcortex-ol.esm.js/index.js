@@ -40683,7 +40683,7 @@ var devDependencies = {
 	"eslint-plugin-promise": "6.1.1",
 	husky: "8.0.2",
 	"lint-staged": "13.0.3",
-	prettier: "2.7.1",
+	prettier: "2.8.0",
 	rimraf: "3.0.2",
 	rollup: "2.79.1",
 	"rollup-plugin-babel": "4.4.0",
