@@ -40669,7 +40669,7 @@ var devDependencies = {
 	"@rollup/plugin-json": "4.1.0",
 	"@rollup/plugin-node-resolve": "13.3.0",
 	"babel-loader": "8.3.0",
-	browserslist: "4.21.4",
+	browserslist: "4.21.5",
 	"caniuse-lite": "1.0.30001449",
 	concurrently: "7.6.0",
 	"core-js": "3.27.2",
