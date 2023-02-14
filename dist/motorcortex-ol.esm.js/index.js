@@ -40672,7 +40672,7 @@ var devDependencies = {
 	browserslist: "4.21.5",
 	"caniuse-lite": "1.0.30001452",
 	concurrently: "7.6.0",
-	"core-js": "3.27.2",
+	"core-js": "3.28.0",
 	"css-loader": "6.7.3",
 	eslint: "8.34.0",
 	"eslint-config-prettier": "8.6.0",
