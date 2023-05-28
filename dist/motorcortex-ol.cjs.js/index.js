@@ -40692,7 +40692,7 @@ var devDependencies = {
 	"rollup-plugin-cleanup": "3.2.1",
 	"rollup-plugin-commonjs": "10.1.0",
 	"rollup-plugin-terser": "7.0.2",
-	"style-loader": "3.3.1",
+	"style-loader": "3.3.3",
 	tslib: "2.5.0",
 	webpack: "5.75.0",
 	"webpack-cli": "4.10.0",
