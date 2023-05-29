@@ -40676,7 +40676,7 @@ var devDependencies = {
 	concurrently: "7.6.0",
 	"core-js": "3.30.2",
 	"css-loader": "6.8.1",
-	eslint: "8.34.0",
+	eslint: "8.41.0",
 	"eslint-config-prettier": "8.6.0",
 	"eslint-plugin-babel": "5.3.1",
 	"eslint-plugin-import": "2.27.5",
