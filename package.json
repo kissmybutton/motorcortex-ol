@@ -46,7 +46,7 @@
     ]
   },
   "dependencies": {
-    "ol": "^6.13.0"
+    "ol": "^7.0.0"
   },
   "peerDependencies": {
     "@donkeyclip/motorcortex": ">= 8 < 10"
