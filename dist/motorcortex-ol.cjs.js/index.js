@@ -298,7 +298,7 @@ function getUid(obj) {
  * OpenLayers version.
  * @type {string}
  */
-var VERSION = '6.13.0';
+var VERSION = '6.15.1';
 
 /**
  * @module ol/has
@@ -313,7 +313,12 @@ var FIREFOX = ua.indexOf('firefox') !== -1;
  * User agent string says we are dealing with Safari as browser.
  * @type {boolean}
  */
-ua.indexOf('safari') !== -1 && ua.indexOf('chrom') == -1;
+var SAFARI = ua.indexOf('safari') !== -1 && ua.indexOf('chrom') == -1;
+/**
+ * https://bugs.webkit.org/show_bug.cgi?id=237906
+ * @type {boolean}
+ */
+SAFARI && !!(ua.indexOf('version/15.4') >= 0 || ua.match(/cpu (os|iphone os) 15_4 like mac os x/));
 /**
  * User agent string says we are dealing with a WebKit engine.
  * @type {boolean}
@@ -601,20 +606,6 @@ function toString$1(mat) {
 }
 
 /**
- * @module ol/extent/Corner
- */
-/**
- * Extent corner.
- * @enum {string}
- */
-var Corner = {
-  BOTTOM_LEFT: 'bottom-left',
-  BOTTOM_RIGHT: 'bottom-right',
-  TOP_LEFT: 'top-left',
-  TOP_RIGHT: 'top-right'
-};
-
-/**
  * @module ol/extent/Relationship
  */
 /**
@@ -637,6 +628,10 @@ var Relationship = {
  * An array of numbers representing an extent: `[minx, miny, maxx, maxy]`.
  * @typedef {Array<number>} Extent
  * @api
+ */
+/**
+ * Extent corner.
+ * @typedef {'bottom-left' | 'bottom-right' | 'top-left' | 'top-right'} Corner
  */
 /**
  * Build an extent that includes all given coordinates.
@@ -986,18 +981,18 @@ function getCenter(extent) {
 /**
  * Get a corner coordinate of an extent.
  * @param {Extent} extent Extent.
- * @param {import("./extent/Corner.js").default} corner Corner.
+ * @param {Corner} corner Corner.
  * @return {import("./coordinate.js").Coordinate} Corner coordinate.
  */
 function getCorner(extent, corner) {
   var coordinate;
-  if (corner === Corner.BOTTOM_LEFT) {
+  if (corner === 'bottom-left') {
     coordinate = getBottomLeft(extent);
-  } else if (corner === Corner.BOTTOM_RIGHT) {
+  } else if (corner === 'bottom-right') {
     coordinate = getBottomRight(extent);
-  } else if (corner === Corner.TOP_LEFT) {
+  } else if (corner === 'top-left') {
     coordinate = getTopLeft(extent);
-  } else if (corner === Corner.TOP_RIGHT) {
+  } else if (corner === 'top-right') {
     coordinate = getTopRight(extent);
   } else {
     assert(false, 13); // Invalid corner
@@ -1014,6 +1009,25 @@ function getCorner(extent, corner) {
  * @return {Extent} Extent.
  */
 function getForViewAndSize(center, resolution, rotation, size, opt_extent) {
+  var _a = getRotatedViewport(center, resolution, rotation, size),
+    x0 = _a[0],
+    y0 = _a[1],
+    x1 = _a[2],
+    y1 = _a[3],
+    x2 = _a[4],
+    y2 = _a[5],
+    x3 = _a[6],
+    y3 = _a[7];
+  return createOrUpdate$2(Math.min(x0, x1, x2, x3), Math.min(y0, y1, y2, y3), Math.max(x0, x1, x2, x3), Math.max(y0, y1, y2, y3), opt_extent);
+}
+/**
+ * @param {import("./coordinate.js").Coordinate} center Center.
+ * @param {number} resolution Resolution.
+ * @param {number} rotation Rotation.
+ * @param {import("./size.js").Size} size Size.
+ * @return {Array<number>} Linear ring representing the viewport.
+ */
+function getRotatedViewport(center, resolution, rotation, size) {
   var dx = resolution * size[0] / 2;
   var dy = resolution * size[1] / 2;
   var cosRotation = Math.cos(rotation);
@@ -1024,15 +1038,7 @@ function getForViewAndSize(center, resolution, rotation, size, opt_extent) {
   var ySin = dy * sinRotation;
   var x = center[0];
   var y = center[1];
-  var x0 = x - xCos + ySin;
-  var x1 = x - xCos - ySin;
-  var x2 = x + xCos - ySin;
-  var x3 = x + xCos + ySin;
-  var y0 = y - xSin - yCos;
-  var y1 = y - xSin + yCos;
-  var y2 = y + xSin + yCos;
-  var y3 = y + xSin - yCos;
-  return createOrUpdate$2(Math.min(x0, x1, x2, x3), Math.min(y0, y1, y2, y3), Math.max(x0, x1, x2, x3), Math.max(y0, y1, y2, y3), opt_extent);
+  return [x - xCos + ySin, y - xSin - yCos, x - xCos - ySin, y - xSin + yCos, x + xCos - ySin, y + xSin + yCos, x + xCos + ySin, y + xSin - yCos, x - xCos + ySin, y - xSin - yCos];
 }
 /**
  * Get the height of an extent.
@@ -1221,6 +1227,39 @@ function wrapX$2(extent, projection) {
     extent[2] -= offset;
   }
   return extent;
+}
+/**
+ * Fits the extent to the real world
+ *
+ * If the extent does not cross the anti meridian, this will return the extent in an array
+ * If the extent crosses the anti meridian, the extent will be sliced, so each part fits within the
+ * real world
+ *
+ *
+ * @param {Extent} extent Extent.
+ * @param {import("./proj/Projection.js").default} projection Projection
+ * @return {Array<Extent>} The extent within the real world extent.
+ */
+function wrapAndSliceX(extent, projection) {
+  if (projection.canWrapX()) {
+    var projectionExtent = projection.getExtent();
+    if (!isFinite(extent[0]) || !isFinite(extent[2])) {
+      return [[projectionExtent[0], extent[1], projectionExtent[2], extent[3]]];
+    }
+    wrapX$2(extent, projection);
+    var worldWidth = getWidth(projectionExtent);
+    if (getWidth(extent) > worldWidth) {
+      // the extent wraps around on itself
+      return [[projectionExtent[0], extent[1], projectionExtent[2], extent[3]]];
+    } else if (extent[0] < projectionExtent[0]) {
+      // the extent crosses the anti meridian, so it needs to be sliced
+      return [[extent[0] + worldWidth, extent[1], projectionExtent[2], extent[3]], [projectionExtent[0], extent[1], extent[2], extent[3]]];
+    } else if (extent[2] > projectionExtent[2]) {
+      // the extent crosses the anti meridian, so it needs to be sliced
+      return [[extent[0], extent[1], projectionExtent[2], extent[3]], [projectionExtent[0], extent[1], extent[2] - worldWidth, extent[3]]];
+    }
+  }
+  return [extent];
 }
 
 /**
@@ -2915,7 +2954,7 @@ var BaseLayer = /** @class */function (_super) {
   };
   /**
    * @abstract
-   * @return {import("../source/State.js").default} Source state.
+   * @return {import("../source/Source.js").State} Source state.
    */
   BaseLayer.prototype.getSourceState = function () {
     return abstract();
@@ -3092,20 +3131,6 @@ var RenderEventType = {
  * @typedef {'postrender'|'prerender'} LayerRenderEventTypes
  */
 
-/**
- * @module ol/source/State
- */
-/**
- * @enum {string}
- * State of the source, one of 'undefined', 'loading', 'ready' or 'error'.
- */
-var SourceState = {
-  UNDEFINED: 'undefined',
-  LOADING: 'loading',
-  READY: 'ready',
-  ERROR: 'error'
-};
-
 var __extends$1o = undefined && undefined.__extends || function () {
   var extendStatics = function (d, b) {
     extendStatics = Object.setPrototypeOf || {
@@ -3170,7 +3195,6 @@ var __extends$1o = undefined && undefined.__extends || function () {
  * @typedef {Object} State
  * @property {import("./Layer.js").default} layer Layer.
  * @property {number} opacity Opacity, the value is rounded to two digits to appear after the decimal point.
- * @property {import("../source/Source.js").default|undefined} source Source being rendered (only for multi-source layers).
  * @property {boolean} visible Visible.
  * @property {boolean} managed Managed.
  * @property {import("../extent.js").Extent} [extent] Extent.
@@ -3303,11 +3327,11 @@ var Layer = /** @class */function (_super) {
     return this.getSource();
   };
   /**
-   * @return {import("../source/State.js").default} Source state.
+   * @return {import("../source/Source.js").State} Source state.
    */
   Layer.prototype.getSourceState = function () {
     var source = this.getSource();
-    return !source ? SourceState.UNDEFINED : source.getState();
+    return !source ? 'undefined' : source.getState();
   };
   /**
    * @private
@@ -3440,7 +3464,7 @@ var Layer = /** @class */function (_super) {
   };
   /**
    * Get the renderer for this layer.
-   * @return {RendererType} The layer renderer.
+   * @return {RendererType|null} The layer renderer.
    */
   Layer.prototype.getRenderer = function () {
     if (!this.renderer_) {
@@ -4077,13 +4101,6 @@ var getFontParameters = function (fontSpec) {
   style.families = style.family.split(/,\s?/);
   return style;
 };
-/**
- * @param {number} opacity Opacity (0..1).
- * @return {string} CSS opacity.
- */
-function cssOpacity(opacity) {
-  return opacity === 1 ? '' : String(Math.round(opacity * 100) / 100);
-}
 
 /**
  * @module ol/dom
@@ -4116,6 +4133,17 @@ function createCanvasContext2D(opt_width, opt_height, opt_canvasPool, opt_Contex
   //FIXME Allow OffscreenCanvasRenderingContext2D as return type
   return (/** @type {CanvasRenderingContext2D} */canvas.getContext('2d', opt_Context2DSettings)
   );
+}
+/**
+ * Releases canvas memory to avoid exceeding memory limits in Safari.
+ * See https://pqina.nl/blog/total-canvas-memory-use-exceeds-the-maximum-limit/
+ * @param {CanvasRenderingContext2D} context Context.
+ */
+function releaseCanvas(context) {
+  var canvas = context.canvas;
+  canvas.width = 1;
+  canvas.height = 1;
+  context.clearRect(0, 0, 1, 1);
 }
 /**
  * Get the current computed width for the given element including margin,
@@ -4209,6 +4237,9 @@ function replaceChildren(node, children) {
  * @module ol/render/canvas
  */
 /**
+ * @typedef {'Circle' | 'Image' | 'LineString' | 'Polygon' | 'Text' | 'Default'} BuilderType
+ */
+/**
  * @typedef {Object} FillState
  * @property {import("../colorlike.js").ColorLike} fillStyle FillStyle.
  */
@@ -4252,6 +4283,7 @@ function replaceChildren(node, children) {
  * @typedef {Object} TextState
  * @property {string} font Font.
  * @property {string} [textAlign] TextAlign.
+ * @property {string} [justify] Justify.
  * @property {string} textBaseline TextBaseline.
  * @property {string} [placement] Placement.
  * @property {number} [maxAngle] MaxAngle.
@@ -4513,7 +4545,9 @@ function measureAndCacheTextWidth(font, text, cache) {
   if (text in cache) {
     return cache[text];
   }
-  var width = measureTextWidth(font, text);
+  var width = text.split('\n').reduce(function (prev, curr) {
+    return Math.max(prev, measureTextWidth(font, curr));
+  }, 0);
   cache[text] = width;
   return width;
 }
@@ -4713,7 +4747,7 @@ var CompositeMapRenderer = /** @class */function (_super) {
       frameState.layerIndex = i;
       var layer = layerState.layer;
       var sourceState = layer.getSourceState();
-      if (!inView(layerState, viewState) || sourceState != SourceState.READY && sourceState != SourceState.UNDEFINED) {
+      if (!inView(layerState, viewState) || sourceState != 'ready' && sourceState != 'undefined') {
         layer.unrender();
         continue;
       }
@@ -5387,10 +5421,10 @@ var LayerGroup = /** @class */function (_super) {
     return states;
   };
   /**
-   * @return {import("../source/State.js").default} Source state.
+   * @return {import("../source/Source.js").State} Source state.
    */
   LayerGroup.prototype.getSourceState = function () {
-    return SourceState.READY;
+    return 'ready';
   };
   return LayerGroup;
 }(BaseLayer);
@@ -5479,9 +5513,10 @@ var MapBrowserEvent = /** @class */function (_super) {
    * @param {import("./PluggableMap.js").default} map Map.
    * @param {EVENT} originalEvent Original event.
    * @param {boolean} [opt_dragging] Is the map currently being dragged?
-   * @param {?import("./PluggableMap.js").FrameState} [opt_frameState] Frame state.
+   * @param {import("./PluggableMap.js").FrameState} [opt_frameState] Frame state.
+   * @param {Array<PointerEvent>} [opt_activePointers] Active pointers.
    */
-  function MapBrowserEvent(type, map, originalEvent, opt_dragging, opt_frameState) {
+  function MapBrowserEvent(type, map, originalEvent, opt_dragging, opt_frameState, opt_activePointers) {
     var _this = _super.call(this, type, map, opt_frameState) || this;
     /**
      * The original browser event.
@@ -5508,6 +5543,10 @@ var MapBrowserEvent = /** @class */function (_super) {
      * @api
      */
     _this.dragging = opt_dragging !== undefined ? opt_dragging : false;
+    /**
+     * @type {Array<PointerEvent>|undefined}
+     */
+    _this.activePointers = opt_activePointers;
     return _this;
   }
   Object.defineProperty(MapBrowserEvent.prototype, "pixel", {
@@ -5713,12 +5752,12 @@ var MapBrowserEventHandler = /** @class */function (_super) {
     _this.down_ = null;
     var element = _this.map_.getViewport();
     /**
-     * @type {number}
+     * @type {Array<PointerEvent>}
      * @private
      */
-    _this.activePointers_ = 0;
+    _this.activePointers_ = [];
     /**
-     * @type {!Object<number, boolean>}
+     * @type {!Object<number, Event>}
      * @private
      */
     _this.trackedTouches_ = {};
@@ -5737,7 +5776,7 @@ var MapBrowserEventHandler = /** @class */function (_super) {
      * @type {?import("./events.js").EventsKey}
      * @private
      */
-    _this.relayedListenerKey_ = listen(element, PointerEventType.POINTERMOVE, _this.relayEvent_, _this);
+    _this.relayedListenerKey_ = listen(element, PointerEventType.POINTERMOVE, _this.relayMoveEvent_, _this);
     /**
      * @private
      */
@@ -5780,12 +5819,23 @@ var MapBrowserEventHandler = /** @class */function (_super) {
    */
   MapBrowserEventHandler.prototype.updateActivePointers_ = function (pointerEvent) {
     var event = pointerEvent;
+    var id = event.pointerId;
     if (event.type == MapBrowserEventType.POINTERUP || event.type == MapBrowserEventType.POINTERCANCEL) {
-      delete this.trackedTouches_[event.pointerId];
-    } else if (event.type == MapBrowserEventType.POINTERDOWN) {
-      this.trackedTouches_[event.pointerId] = true;
+      delete this.trackedTouches_[id];
+      for (var pointerId in this.trackedTouches_) {
+        if (this.trackedTouches_[pointerId].target !== event.target) {
+          // Some platforms assign a new pointerId when the target changes.
+          // If this happens, delete one tracked pointer. If there is more
+          // than one tracked pointer for the old target, it will be cleared
+          // by subsequent POINTERUP events from other pointers.
+          delete this.trackedTouches_[pointerId];
+          break;
+        }
+      }
+    } else if (event.type == MapBrowserEventType.POINTERDOWN || event.type == MapBrowserEventType.POINTERMOVE) {
+      this.trackedTouches_[id] = event;
     }
-    this.activePointers_ = Object.keys(this.trackedTouches_).length;
+    this.activePointers_ = getValues(this.trackedTouches_);
   };
   /**
    * @param {PointerEvent} pointerEvent Pointer
@@ -5794,7 +5844,7 @@ var MapBrowserEventHandler = /** @class */function (_super) {
    */
   MapBrowserEventHandler.prototype.handlePointerUp_ = function (pointerEvent) {
     this.updateActivePointers_(pointerEvent);
-    var newEvent = new MapBrowserEvent(MapBrowserEventType.POINTERUP, this.map_, pointerEvent);
+    var newEvent = new MapBrowserEvent(MapBrowserEventType.POINTERUP, this.map_, pointerEvent, undefined, undefined, this.activePointers_);
     this.dispatchEvent(newEvent);
     // We emulate click events on left mouse button click, touch contact, and pen
     // contact. isMouseActionButton returns true in these cases (evt.button is set
@@ -5805,7 +5855,7 @@ var MapBrowserEventHandler = /** @class */function (_super) {
     if (this.emulateClicks_ && !newEvent.defaultPrevented && !this.dragging_ && this.isMouseActionButton_(pointerEvent)) {
       this.emulateClick_(this.down_);
     }
-    if (this.activePointers_ === 0) {
+    if (this.activePointers_.length === 0) {
       this.dragListenerKeys_.forEach(unlistenByKey);
       this.dragListenerKeys_.length = 0;
       this.dragging_ = false;
@@ -5827,9 +5877,9 @@ var MapBrowserEventHandler = /** @class */function (_super) {
    * @private
    */
   MapBrowserEventHandler.prototype.handlePointerDown_ = function (pointerEvent) {
-    this.emulateClicks_ = this.activePointers_ === 0;
+    this.emulateClicks_ = this.activePointers_.length === 0;
     this.updateActivePointers_(pointerEvent);
-    var newEvent = new MapBrowserEvent(MapBrowserEventType.POINTERDOWN, this.map_, pointerEvent);
+    var newEvent = new MapBrowserEvent(MapBrowserEventType.POINTERDOWN, this.map_, pointerEvent, undefined, undefined, this.activePointers_);
     this.dispatchEvent(newEvent);
     // Store a copy of the down event
     this.down_ = /** @type {PointerEvent} */{};
@@ -5869,22 +5919,22 @@ var MapBrowserEventHandler = /** @class */function (_super) {
     // To avoid a 'false' touchmove event to be dispatched, we test if the pointer
     // moved a significant distance.
     if (this.isMoving_(pointerEvent)) {
+      this.updateActivePointers_(pointerEvent);
       this.dragging_ = true;
-      var newEvent = new MapBrowserEvent(MapBrowserEventType.POINTERDRAG, this.map_, pointerEvent, this.dragging_);
+      var newEvent = new MapBrowserEvent(MapBrowserEventType.POINTERDRAG, this.map_, pointerEvent, this.dragging_, undefined, this.activePointers_);
       this.dispatchEvent(newEvent);
     }
   };
   /**
-   * Wrap and relay a pointer event.  Note that this requires that the type
-   * string for the MapBrowserEvent matches the PointerEvent type.
+   * Wrap and relay a pointermove event.
    * @param {PointerEvent} pointerEvent Pointer
    * event.
    * @private
    */
-  MapBrowserEventHandler.prototype.relayEvent_ = function (pointerEvent) {
+  MapBrowserEventHandler.prototype.relayMoveEvent_ = function (pointerEvent) {
     this.originalPointerMoveEvent_ = pointerEvent;
     var dragging = !!(this.down_ && this.isMoving_(pointerEvent));
-    this.dispatchEvent(new MapBrowserEvent(pointerEvent.type, this.map_, pointerEvent, dragging));
+    this.dispatchEvent(new MapBrowserEvent(MapBrowserEventType.POINTERMOVE, this.map_, pointerEvent, dragging));
   };
   /**
    * Flexible handling of a `touch-action: none` css equivalent: because calling
@@ -5956,10 +6006,22 @@ var MapEventType = {
    * @event module:ol/MapEvent~MapEvent#moveend
    * @api
    */
-  MOVEEND: 'moveend'
+  MOVEEND: 'moveend',
+  /**
+   * Triggered when loading of additional map data (tiles, images, features) starts.
+   * @event module:ol/MapEvent~MapEvent#loadstart
+   * @api
+   */
+  LOADSTART: 'loadstart',
+  /**
+   * Triggered when loading of additional map data has completed.
+   * @event module:ol/MapEvent~MapEvent#loadend
+   * @api
+   */
+  LOADEND: 'loadend'
 };
 /***
- * @typedef {'postrender'|'movestart'|'moveend'} Types
+ * @typedef {'postrender'|'movestart'|'moveend'|'loadstart'|'loadend'} Types
  */
 
 /**
@@ -6374,27 +6436,6 @@ function getTilePriority(frameState, tile, tileSourceKey, tileCenter, tileResolu
   var deltaY = tileCenter[1] - center[1];
   return 65536 * Math.log(tileResolution) + Math.sqrt(deltaX * deltaX + deltaY * deltaY) / tileResolution;
 }
-
-/**
- * @module ol/geom/GeometryType
- */
-/**
- * The geometry type. One of `'Point'`, `'LineString'`, `'LinearRing'`,
- * `'Polygon'`, `'MultiPoint'`, `'MultiLineString'`, `'MultiPolygon'`,
- * `'GeometryCollection'`, `'Circle'`.
- * @enum {string}
- */
-var GeometryType = {
-  POINT: 'Point',
-  LINE_STRING: 'LineString',
-  LINEAR_RING: 'LinearRing',
-  POLYGON: 'Polygon',
-  MULTI_POINT: 'MultiPoint',
-  MULTI_LINE_STRING: 'MultiLineString',
-  MULTI_POLYGON: 'MultiPolygon',
-  GEOMETRY_COLLECTION: 'GeometryCollection',
-  CIRCLE: 'Circle'
-};
 
 /**
  * @module ol/proj/Units
@@ -7356,7 +7397,7 @@ function fromUserCoordinate(coordinate, destProjection) {
     if (showCoordinateWarning && !equals(coordinate, [0, 0]) && coordinate[0] >= -180 && coordinate[0] <= 180 && coordinate[1] >= -90 && coordinate[1] <= 90) {
       showCoordinateWarning = false;
       // eslint-disable-next-line no-console
-      console.warn('Call useGeographic() ol/proj once to work with [longitude, latitude] coordinates.');
+      console.warn('Call useGeographic() from ol/proj once to work with [longitude, latitude] coordinates.');
     }
     return coordinate;
   }
@@ -7904,6 +7945,12 @@ var __extends$1c = undefined && undefined.__extends || function () {
   };
 }();
 /**
+ * @typedef {'Point' | 'LineString' | 'LinearRing' | 'Polygon' | 'MultiPoint' | 'MultiLineString' | 'MultiPolygon' | 'GeometryCollection' | 'Circle'} Type
+ * The geometry type.  One of `'Point'`, `'LineString'`, `'LinearRing'`,
+ * `'Polygon'`, `'MultiPoint'`, `'MultiLineString'`, `'MultiPolygon'`,
+ * `'GeometryCollection'`, or `'Circle'`.
+ */
+/**
  * @type {import("../transform.js").Transform}
  */
 var tmpTransform = create();
@@ -8097,7 +8144,7 @@ var Geometry = /** @class */function (_super) {
   /**
    * Get the type of this geometry.
    * @abstract
-   * @return {import("./GeometryType.js").default} Geometry type.
+   * @return {Type} Geometry type.
    */
   Geometry.prototype.getType = function () {
     return abstract();
@@ -9204,11 +9251,11 @@ var LinearRing = /** @class */function (_super) {
   };
   /**
    * Get the type of this geometry.
-   * @return {import("./GeometryType.js").default} Geometry type.
+   * @return {import("./Geometry.js").Type} Geometry type.
    * @api
    */
   LinearRing.prototype.getType = function () {
-    return GeometryType.LINEAR_RING;
+    return 'LinearRing';
   };
   /**
    * Test if the geometry and the passed extent intersect.
@@ -9322,11 +9369,11 @@ var Point = /** @class */function (_super) {
   };
   /**
    * Get the type of this geometry.
-   * @return {import("./GeometryType.js").default} Geometry type.
+   * @return {import("./Geometry.js").Type} Geometry type.
    * @api
    */
   Point.prototype.getType = function () {
-    return GeometryType.POINT;
+    return 'Point';
   };
   /**
    * Test if the geometry and the passed extent intersect.
@@ -10107,11 +10154,11 @@ var Polygon = /** @class */function (_super) {
   };
   /**
    * Get the type of this geometry.
-   * @return {import("./GeometryType.js").default} Geometry type.
+   * @return {import("./Geometry.js").Type} Geometry type.
    * @api
    */
   Polygon.prototype.getType = function () {
-    return GeometryType.POLYGON;
+    return 'Polygon';
   };
   /**
    * Test if the geometry and the passed extent intersect.
@@ -10549,14 +10596,14 @@ var View = /** @class */function (_super) {
      * @type {import("./coordinate.js").Coordinate|undefined}
      */
     _this.cancelAnchor_ = undefined;
+    if (options.projection) {
+      disableCoordinateWarning();
+    }
     if (options.center) {
       options.center = fromUserCoordinate(options.center, _this.projection_);
     }
     if (options.extent) {
       options.extent = fromUserExtent(options.extent, _this.projection_);
-    }
-    if (options.projection) {
-      disableCoordinateWarning();
     }
     _this.applyOptions_(options);
     return _this;
@@ -11350,7 +11397,7 @@ var View = /** @class */function (_super) {
       assert(!isEmpty$1(geometryOrExtent), 25); // Cannot fit empty extent provided as `geometry`
       var extent = fromUserExtent(geometryOrExtent, this.getProjection());
       geometry = fromExtent(extent);
-    } else if (geometryOrExtent.getType() === GeometryType.CIRCLE) {
+    } else if (geometryOrExtent.getType() === 'Circle') {
       var extent = fromUserExtent(geometryOrExtent.getExtent(), this.getProjection());
       geometry = fromExtent(extent);
       geometry.rotate(this.getRotation(), getCenter(extent));
@@ -12156,9 +12203,14 @@ var PluggableMap = /** @class */function (_super) {
     var optionsInternal = createOptionsInternal(options);
     /**
      * @private
-     * @type {boolean}
+     * @type {boolean|undefined}
      */
     _this.renderComplete_;
+    /**
+     * @private
+     * @type {boolean}
+     */
+    _this.loaded_ = true;
     /** @private */
     _this.boundHandleBrowserEvent_ = _this.handleBrowserEvent.bind(_this);
     /**
@@ -12305,7 +12357,7 @@ var PluggableMap = /** @class */function (_super) {
      */
     _this.overlayIdIndex_ = {};
     /**
-     * @type {import("./renderer/Map.js").default}
+     * @type {import("./renderer/Map.js").default|null}
      * @private
      */
     _this.renderer_ = null;
@@ -12415,7 +12467,7 @@ var PluggableMap = /** @class */function (_super) {
   };
   /**
    * Add the given interaction to the map. If you want to add an interaction
-   * at another point of the collection use `getInteraction()` and the methods
+   * at another point of the collection use `getInteractions()` and the methods
    * available on {@link module:ol/Collection~Collection}. This can be used to
    * stop the event propagation from the handleEvent function. The interactions
    * get to handle the events in the reverse order of this collection.
@@ -12468,6 +12520,9 @@ var PluggableMap = /** @class */function (_super) {
    * Clean up.
    */
   PluggableMap.prototype.disposeInternal = function () {
+    this.controls.clear();
+    this.interactions.clear();
+    this.overlays_.clear();
     this.setTarget(null);
     _super.prototype.disposeInternal.call(this);
   };
@@ -12490,7 +12545,7 @@ var PluggableMap = /** @class */function (_super) {
    * @api
    */
   PluggableMap.prototype.forEachFeatureAtPixel = function (pixel, callback, opt_options) {
-    if (!this.frameState_) {
+    if (!this.frameState_ || !this.renderer_) {
       return;
     }
     var coordinate = this.getCoordinateFromPixelInternal(pixel);
@@ -12563,7 +12618,7 @@ var PluggableMap = /** @class */function (_super) {
    * @deprecated
    */
   PluggableMap.prototype.forEachLayerAtPixel = function (pixel, callback, opt_options) {
-    if (!this.frameState_) {
+    if (!this.frameState_ || !this.renderer_) {
       return;
     }
     var options = opt_options || {};
@@ -12580,7 +12635,7 @@ var PluggableMap = /** @class */function (_super) {
    * @api
    */
   PluggableMap.prototype.hasFeatureAtPixel = function (pixel, opt_options) {
-    if (!this.frameState_) {
+    if (!this.frameState_ || !this.renderer_) {
       return false;
     }
     var coordinate = this.getCoordinateFromPixelInternal(pixel);
@@ -12753,11 +12808,15 @@ var PluggableMap = /** @class */function (_super) {
   PluggableMap.prototype.getLoadingOrNotReady = function () {
     var layerStatesArray = this.getLayerGroup().getLayerStatesArray();
     for (var i = 0, ii = layerStatesArray.length; i < ii; ++i) {
-      var layer = layerStatesArray[i].layer;
-      if (!layer.getRenderer().ready) {
+      var state = layerStatesArray[i];
+      if (!state.visible) {
+        continue;
+      }
+      var renderer = state.layer.getRenderer();
+      if (renderer && !renderer.ready) {
         return true;
       }
-      var source = /** @type {import("./layer/Layer.js").default} */layer.getSource();
+      var source = /** @type {import("./layer/Layer.js").default} */state.layer.getSource();
       if (source && source.loading) {
         return true;
       }
@@ -12791,7 +12850,7 @@ var PluggableMap = /** @class */function (_super) {
   };
   /**
    * Get the map renderer.
-   * @return {import("./renderer/Map.js").default} Renderer
+   * @return {import("./renderer/Map.js").default|null} Renderer
    */
   PluggableMap.prototype.getRenderer = function () {
     return this.renderer_;
@@ -12944,8 +13003,19 @@ var PluggableMap = /** @class */function (_super) {
         tileQueue.loadMoreTiles(maxTotalLoading, maxNewLoads);
       }
     }
-    if (frameState && this.hasListener(RenderEventType.RENDERCOMPLETE) && !frameState.animate && this.renderComplete_) {
-      this.renderer_.dispatchRenderEvent(RenderEventType.RENDERCOMPLETE, frameState);
+    if (frameState && this.renderer_ && !frameState.animate) {
+      if (this.renderComplete_ === true) {
+        if (this.hasListener(RenderEventType.RENDERCOMPLETE)) {
+          this.renderer_.dispatchRenderEvent(RenderEventType.RENDERCOMPLETE, frameState);
+        }
+        if (this.loaded_ === false) {
+          this.loaded_ = true;
+          this.dispatchEvent(new MapEvent(MapEventType.LOADEND, this, frameState));
+        }
+      } else if (this.loaded_ === true) {
+        this.loaded_ = false;
+        this.dispatchEvent(new MapEvent(MapEventType.LOADSTART, this, frameState));
+      }
     }
     var postRenderFunctions = this.postRenderFunctions_;
     for (var i = 0, ii = postRenderFunctions.length; i < ii; ++i) {
@@ -13189,6 +13259,7 @@ var PluggableMap = /** @class */function (_super) {
       }
     }
     this.frameState_ = frameState;
+    /** @type {import("./renderer/Map.js").default} */
     this.renderer_.renderFrame(frameState);
     if (frameState) {
       if (frameState.animate) {
@@ -13209,7 +13280,7 @@ var PluggableMap = /** @class */function (_super) {
       }
     }
     this.dispatchEvent(new MapEvent(MapEventType.POSTRENDER, this, frameState));
-    this.renderComplete_ = !this.tileQueue_.getTilesLoading() && !this.tileQueue_.getCount() && !this.getLoadingOrNotReady();
+    this.renderComplete_ = this.hasListener(MapEventType.LOADSTART) || this.hasListener(MapEventType.LOADEND) || this.hasListener(RenderEventType.RENDERCOMPLETE) ? !this.tileQueue_.getTilesLoading() && !this.tileQueue_.getCount() && !this.getLoadingOrNotReady() : undefined;
     if (!this.postRenderTimeoutHandle_) {
       this.postRenderTimeoutHandle_ = setTimeout(function () {
         _this.postRenderTimeoutHandle_ = undefined;
@@ -14248,6 +14319,25 @@ var FullScreenEventType = {
     _this.un;
     /**
      * @private
+     * @type {boolean}
+     */
+    _this.keys_ = options.keys !== undefined ? options.keys : false;
+    /**
+     * @private
+     * @type {HTMLElement|string|undefined}
+     */
+    _this.source_ = options.source;
+    /**
+     * @type {boolean}
+     * @private
+     */
+    _this.isInFullscreen_ = false;
+    /**
+     * @private
+     */
+    _this.boundHandleMapTargetChange_ = _this.handleMapTargetChange_.bind(_this);
+    /**
+     * @private
      * @type {string}
      */
     _this.cssClassName_ = options.className !== undefined ? options.className : 'ol-full-screen';
@@ -14278,37 +14368,19 @@ var FullScreenEventType = {
      * @type {Text|HTMLElement}
      */
     _this.labelActiveNode_ = typeof labelActive === 'string' ? document.createTextNode(labelActive) : labelActive;
+    var tipLabel = options.tipLabel ? options.tipLabel : 'Toggle full-screen';
     /**
      * @private
      * @type {HTMLElement}
      */
     _this.button_ = document.createElement('button');
-    var tipLabel = options.tipLabel ? options.tipLabel : 'Toggle full-screen';
-    _this.button_.setAttribute('type', 'button');
     _this.button_.title = tipLabel;
+    _this.button_.setAttribute('type', 'button');
     _this.button_.appendChild(_this.labelNode_);
     _this.button_.addEventListener(EventType.CLICK, _this.handleClick_.bind(_this), false);
+    _this.setClassName_(_this.button_, _this.isInFullscreen_);
     _this.element.className = "".concat(_this.cssClassName_, " ").concat(CLASS_UNSELECTABLE, " ").concat(CLASS_CONTROL);
     _this.element.appendChild(_this.button_);
-    /**
-     * @private
-     * @type {boolean}
-     */
-    _this.keys_ = options.keys !== undefined ? options.keys : false;
-    /**
-     * @private
-     * @type {HTMLElement|string|undefined}
-     */
-    _this.source_ = options.source;
-    /**
-     * @type {boolean}
-     * @private
-     */
-    _this.isInFullscreen_ = false;
-    /**
-     * @private
-     */
-    _this.boundHandleMapTargetChange_ = _this.handleMapTargetChange_.bind(_this);
     return _this;
   }
   /**
@@ -14375,13 +14447,14 @@ var FullScreenEventType = {
    * @private
    */
   FullScreen.prototype.setClassName_ = function (element, fullscreen) {
-    var _a, _b, _c;
-    var activeClassName = this.activeClassName_;
-    var inactiveClassName = this.inactiveClassName_;
-    var nextClassName = fullscreen ? activeClassName : inactiveClassName;
-    (_a = element.classList).remove.apply(_a, activeClassName);
-    (_b = element.classList).remove.apply(_b, inactiveClassName);
-    (_c = element.classList).add.apply(_c, nextClassName);
+    var _a, _b, _c, _d;
+    if (fullscreen) {
+      (_a = element.classList).remove.apply(_a, this.inactiveClassName_);
+      (_b = element.classList).add.apply(_b, this.activeClassName_);
+    } else {
+      (_c = element.classList).remove.apply(_c, this.activeClassName_);
+      (_d = element.classList).add.apply(_d, this.inactiveClassName_);
+    }
   };
   /**
    * Remove the control from its current map and attach it to the new map.
@@ -14771,27 +14844,6 @@ var COORDINATE_FORMAT = 'coordinateFormat';
   return MousePosition;
 })(Control);
 
-/**
- * @module ol/OverlayPositioning
- */
-/**
- * Overlay position: `'bottom-left'`, `'bottom-center'`,  `'bottom-right'`,
- * `'center-left'`, `'center-center'`, `'center-right'`, `'top-left'`,
- * `'top-center'`, `'top-right'`
- * @enum {string}
- */
-var OverlayPositioning = {
-  BOTTOM_LEFT: 'bottom-left',
-  BOTTOM_CENTER: 'bottom-center',
-  BOTTOM_RIGHT: 'bottom-right',
-  CENTER_LEFT: 'center-left',
-  CENTER_CENTER: 'center-center',
-  CENTER_RIGHT: 'center-right',
-  TOP_LEFT: 'top-left',
-  TOP_CENTER: 'top-center',
-  TOP_RIGHT: 'top-right'
-};
-
 var __extends$$ = undefined && undefined.__extends || function () {
   var extendStatics = function (d, b) {
     extendStatics = Object.setPrototypeOf || {
@@ -14813,6 +14865,12 @@ var __extends$$ = undefined && undefined.__extends || function () {
   };
 }();
 /**
+ * @typedef {'bottom-left' | 'bottom-center' | 'bottom-right' | 'center-left' | 'center-center' | 'center-right' | 'top-left' | 'top-center' | 'top-right'} Positioning
+ * The overlay position: `'bottom-left'`, `'bottom-center'`,  `'bottom-right'`,
+ * `'center-left'`, `'center-center'`, `'center-right'`, `'top-left'`,
+ * `'top-center'`, or `'top-right'`.
+ */
+/**
  * @typedef {Object} Options
  * @property {number|string} [id] Set the overlay id. The overlay id can be used
  * with the {@link module:ol/Map~Map#getOverlayById} method.
@@ -14824,7 +14882,7 @@ var __extends$$ = undefined && undefined.__extends || function () {
  * shifts the overlay down.
  * @property {import("./coordinate.js").Coordinate} [position] The overlay position
  * in map projection.
- * @property {import("./OverlayPositioning.js").default} [positioning='top-left'] Defines how
+ * @property {Positioning} [positioning='top-left'] Defines how
  * the overlay is actually positioned with respect to its `position` property.
  * Possible values are `'bottom-left'`, `'bottom-center'`, `'bottom-right'`,
  * `'center-left'`, `'center-center'`, `'center-right'`, `'top-left'`,
@@ -14994,7 +15052,7 @@ var Overlay = /** @class */function (_super) {
       _this.setElement(options.element);
     }
     _this.setOffset(options.offset !== undefined ? options.offset : [0, 0]);
-    _this.setPositioning(options.positioning !== undefined ? /** @type {import("./OverlayPositioning.js").default} */options.positioning : OverlayPositioning.TOP_LEFT);
+    _this.setPositioning(options.positioning || 'top-left');
     if (options.position !== undefined) {
       _this.setPosition(options.position);
     }
@@ -15052,13 +15110,13 @@ var Overlay = /** @class */function (_super) {
   };
   /**
    * Get the current positioning of this overlay.
-   * @return {import("./OverlayPositioning.js").default} How the overlay is positioned
+   * @return {Positioning} How the overlay is positioned
    *     relative to its point on the map.
    * @observable
    * @api
    */
   Overlay.prototype.getPositioning = function () {
-    return (/** @type {import("./OverlayPositioning.js").default} */this.get(Property$1.POSITIONING)
+    return (/** @type {Positioning} */this.get(Property$1.POSITIONING)
     );
   };
   /**
@@ -15235,7 +15293,7 @@ var Overlay = /** @class */function (_super) {
   };
   /**
    * Set the positioning for this overlay.
-   * @param {import("./OverlayPositioning.js").default} positioning how the overlay is
+   * @param {Positioning} positioning how the overlay is
    *     positioned relative to its point on the map.
    * @observable
    * @api
@@ -15283,14 +15341,14 @@ var Overlay = /** @class */function (_super) {
     var y = Math.round(pixel[1] + offset[1]) + 'px';
     var posX = '0%';
     var posY = '0%';
-    if (positioning == OverlayPositioning.BOTTOM_RIGHT || positioning == OverlayPositioning.CENTER_RIGHT || positioning == OverlayPositioning.TOP_RIGHT) {
+    if (positioning == 'bottom-right' || positioning == 'center-right' || positioning == 'top-right') {
       posX = '-100%';
-    } else if (positioning == OverlayPositioning.BOTTOM_CENTER || positioning == OverlayPositioning.CENTER_CENTER || positioning == OverlayPositioning.TOP_CENTER) {
+    } else if (positioning == 'bottom-center' || positioning == 'center-center' || positioning == 'top-center') {
       posX = '-50%';
     }
-    if (positioning == OverlayPositioning.BOTTOM_LEFT || positioning == OverlayPositioning.BOTTOM_CENTER || positioning == OverlayPositioning.BOTTOM_RIGHT) {
+    if (positioning == 'bottom-left' || positioning == 'bottom-center' || positioning == 'bottom-right') {
       posY = '-100%';
-    } else if (positioning == OverlayPositioning.CENTER_LEFT || positioning == OverlayPositioning.CENTER_CENTER || positioning == OverlayPositioning.CENTER_RIGHT) {
+    } else if (positioning == 'center-left' || positioning == 'center-center' || positioning == 'center-right') {
       posY = '-50%';
     }
     var transform = "translate(".concat(posX, ", ").concat(posY, ") translate(").concat(x, ", ").concat(y, ")");
@@ -15483,7 +15541,7 @@ var ControlledMap = /** @class */function (_super) {
      */
     _this.boxOverlay_ = new Overlay({
       position: [0, 0],
-      positioning: OverlayPositioning.CENTER_CENTER,
+      positioning: 'center-center',
       element: box
     });
     _this.ovmap_.addOverlay(_this.boxOverlay_);
@@ -15909,6 +15967,8 @@ var DEFAULT_DPI = 25.4 / 0.28;
  * @property {string} [className='ol-scale-line'] CSS Class name.
  * @property {number} [minWidth=64] Minimum width in pixels at the OGC default dpi. The width will be
  * adjusted to match the dpi used.
+ * @property {number} [maxWidth] Maximum width in pixels at the OGC default dpi. The width will be
+ * adjusted to match the dpi used.
  * @property {function(import("../MapEvent.js").default):void} [render] Function called when the control
  * should be re-rendered. This is called in a `requestAnimationFrame` callback.
  * @property {HTMLElement|string} [target] Specify a target if you want the control
@@ -15980,6 +16040,11 @@ var DEFAULT_DPI = 25.4 / 0.28;
      * @type {number}
      */
     _this.minWidth_ = options.minWidth !== undefined ? options.minWidth : 64;
+    /**
+     * @private
+     * @type {number|undefined}
+     */
+    _this.maxWidth_ = options.maxWidth;
     /**
      * @private
      * @type {boolean}
@@ -16070,6 +16135,7 @@ var DEFAULT_DPI = 25.4 / 0.28;
     var pointResolutionUnits = units == Units.DEGREES ? Units$1.DEGREES : Units$1.METERS;
     var pointResolution = getPointResolution(projection, viewState.resolution, center, pointResolutionUnits);
     var minWidth = this.minWidth_ * (this.dpi_ || DEFAULT_DPI) / DEFAULT_DPI;
+    var maxWidth = this.maxWidth_ !== undefined ? this.maxWidth_ * (this.dpi_ || DEFAULT_DPI) / DEFAULT_DPI : undefined;
     var nominalCount = minWidth * pointResolution;
     var suffix = '';
     if (units == Units.DEGREES) {
@@ -16097,7 +16163,7 @@ var DEFAULT_DPI = 25.4 / 0.28;
       }
     } else if (units == Units.NAUTICAL) {
       pointResolution /= 1852;
-      suffix = 'nm';
+      suffix = 'NM';
     } else if (units == Units.METRIC) {
       if (nominalCount < 0.001) {
         suffix = 'μm';
@@ -16128,6 +16194,7 @@ var DEFAULT_DPI = 25.4 / 0.28;
 
     var i = 3 * Math.floor(Math.log(minWidth * pointResolution) / Math.log(10));
     var count, width, decimalCount;
+    var previousCount, previousWidth, previousDecimalCount;
     while (true) {
       decimalCount = Math.floor(i / 3);
       var decimal = Math.pow(10, decimalCount);
@@ -16137,9 +16204,18 @@ var DEFAULT_DPI = 25.4 / 0.28;
         this.element.style.display = 'none';
         this.renderedVisible_ = false;
         return;
+      }
+      if (maxWidth !== undefined && width >= maxWidth) {
+        count = previousCount;
+        width = previousWidth;
+        decimalCount = previousDecimalCount;
+        break;
       } else if (width >= minWidth) {
         break;
       }
+      previousCount = count;
+      previousWidth = width;
+      previousDecimalCount = decimalCount;
       ++i;
     }
     var html;
@@ -16172,23 +16248,19 @@ var DEFAULT_DPI = 25.4 / 0.28;
     var mapScale = '1 : ' + Math.round(this.getScaleForResolution()).toLocaleString();
     var scaleSteps = [];
     var stepWidth = width / this.scaleBarSteps_;
-    var backgroundColor = '#ffffff';
+    var backgroundColor = 'ol-scale-singlebar-odd';
     for (var i = 0; i < this.scaleBarSteps_; i++) {
       if (i === 0) {
         // create the first marker at position 0
         scaleSteps.push(this.createMarker('absolute', i));
       }
-      scaleSteps.push('<div>' + '<div ' + 'class="ol-scale-singlebar" ' + 'style=' + '"width: ' + stepWidth + 'px;' + 'background-color: ' + backgroundColor + ';"' + '>' + '</div>' + this.createMarker('relative', i) + ( /*render text every second step, except when only 2 steps */
+      scaleSteps.push('<div>' + '<div ' + 'class="ol-scale-singlebar ' + backgroundColor + '" ' + 'style=' + '"width: ' + stepWidth + 'px;"' + '>' + '</div>' + this.createMarker('relative', i) + ( /*render text every second step, except when only 2 steps */
       i % 2 === 0 || this.scaleBarSteps_ === 2 ? this.createStepText(i, width, false, scale, suffix) : '') + '</div>');
       if (i === this.scaleBarSteps_ - 1) {
         scaleSteps.push(this.createStepText(i + 1, width, true, scale, suffix));
       }
-      // switch colors of steps between black and white
-      if (backgroundColor === '#ffffff') {
-        backgroundColor = '#000000';
-      } else {
-        backgroundColor = '#ffffff';
-      }
+      // switch style of steps
+      backgroundColor = backgroundColor === 'ol-scale-singlebar-odd' ? 'ol-scale-singlebar-even' : 'ol-scale-singlebar-odd';
     }
     var scaleBarText;
     if (this.scaleBarText_) {
@@ -17057,11 +17129,6 @@ var PointerInteraction = /** @class */function (_super) {
      */
     _this.handlingDownUpSequence = false;
     /**
-     * @type {!Object<string, PointerEvent>}
-     * @private
-     */
-    _this.trackedPointers_ = {};
-    /**
      * @type {Array<PointerEvent>}
      * @protected
      */
@@ -17155,18 +17222,8 @@ var PointerInteraction = /** @class */function (_super) {
    * @private
    */
   PointerInteraction.prototype.updateTrackedPointers_ = function (mapBrowserEvent) {
-    if (isPointerDraggingEvent(mapBrowserEvent)) {
-      var event_1 = mapBrowserEvent.originalEvent;
-      var id = event_1.pointerId.toString();
-      if (mapBrowserEvent.type == MapBrowserEventType.POINTERUP) {
-        delete this.trackedPointers_[id];
-      } else if (mapBrowserEvent.type == MapBrowserEventType.POINTERDOWN) {
-        this.trackedPointers_[id] = event_1;
-      } else if (id in this.trackedPointers_) {
-        // update only when there was a pointerdown event for this pointer
-        this.trackedPointers_[id] = event_1;
-      }
-      this.targetPointers = getValues(this.trackedPointers_);
+    if (mapBrowserEvent.activePointers) {
+      this.targetPointers = mapBrowserEvent.activePointers;
     }
   };
   return PointerInteraction;
@@ -17184,15 +17241,6 @@ function centroid(pointerEvents) {
     clientY += pointerEvents[i].clientY;
   }
   return [clientX / length, clientY / length];
-}
-/**
- * @param {import("../MapBrowserEvent.js").default} mapBrowserEvent Event.
- * @return {boolean} Whether the event is a pointerdown, pointerdrag
- *     or pointerup event.
- */
-function isPointerDraggingEvent(mapBrowserEvent) {
-  var type = mapBrowserEvent.type;
-  return type === MapBrowserEventType.POINTERDOWN || type === MapBrowserEventType.POINTERDRAG || type === MapBrowserEventType.POINTERUP;
 }
 
 /**
@@ -17336,8 +17384,9 @@ var shiftKeyOnly = function (mapBrowserEvent) {
   return !originalEvent.altKey && !(originalEvent.metaKey || originalEvent.ctrlKey) && originalEvent.shiftKey;
 };
 /**
- * Return `true` if the target element is not editable, i.e. not a `<input>`-,
- * `<select>`- or `<textarea>`-element, `false` otherwise.
+ * Return `true` if the target element is not editable, i.e. not an `input`,
+ * `select`, or `textarea` element and no `contenteditable` attribute is
+ * set or inherited, `false` otherwise.
  *
  * @param {import("../MapBrowserEvent.js").default} mapBrowserEvent Map browser event.
  * @return {boolean} True only if the target element is not editable.
@@ -17346,7 +17395,11 @@ var shiftKeyOnly = function (mapBrowserEvent) {
 var targetNotEditable = function (mapBrowserEvent) {
   var originalEvent = /** @type {KeyboardEvent|MouseEvent|TouchEvent} */mapBrowserEvent.originalEvent;
   var tagName = /** @type {Element} */originalEvent.target.tagName;
-  return tagName !== 'INPUT' && tagName !== 'SELECT' && tagName !== 'TEXTAREA';
+  return tagName !== 'INPUT' && tagName !== 'SELECT' && tagName !== 'TEXTAREA' &&
+  // `isContentEditable` is only available on `HTMLElement`, but it may also be a
+  // different type like `SVGElement`.
+  // @ts-ignore
+  !originalEvent.target.isContentEditable;
 };
 /**
  * Return `true` if the event originates from a mouse device.
@@ -18610,7 +18663,11 @@ var MouseWheelZoom = /** @class */function (_super) {
    */
   MouseWheelZoom.prototype.endInteraction_ = function () {
     this.trackpadTimeoutId_ = undefined;
-    var view = this.getMap().getView();
+    var map = this.getMap();
+    if (!map) {
+      return;
+    }
+    var view = map.getView();
     view.endInteraction(undefined, this.lastDelta_ ? this.lastDelta_ > 0 ? 1 : -1 : 0, this.lastAnchor_);
   };
   /**
@@ -19002,19 +19059,6 @@ var PinchZoom = /** @class */function (_super) {
 }(PointerInteraction);
 
 /**
- * @module ol/format/FormatType
- */
-/**
- * @enum {string}
- */
-var FormatType = {
-  ARRAY_BUFFER: 'arraybuffer',
-  JSON: 'json',
-  TEXT: 'text',
-  XML: 'xml'
-};
-
-/**
  * @module ol/interaction/DragAndDrop
  */
 // FIXME should handle all geo-referenced data, not just vector data
@@ -19159,7 +19203,7 @@ var DragAndDropEvent = /** @class */function (_super) {
         format = new format();
       }
       _this.formats_.push(format);
-      _this.readAsBuffer_ = _this.readAsBuffer_ || format.getType() === FormatType.ARRAY_BUFFER;
+      _this.readAsBuffer_ = _this.readAsBuffer_ || format.getType() === 'arraybuffer';
     }
     /**
      * @private
@@ -19201,7 +19245,7 @@ var DragAndDropEvent = /** @class */function (_super) {
     for (var i = 0, ii = formats.length; i < ii; ++i) {
       var format = formats[i];
       var input = result;
-      if (this.readAsBuffer_ && format.getType() !== FormatType.ARRAY_BUFFER) {
+      if (this.readAsBuffer_ && format.getType() !== 'arraybuffer') {
         if (text === undefined) {
           text = new TextDecoder().decode(result);
         }
@@ -19585,11 +19629,11 @@ var Circle = /** @class */function (_super) {
   };
   /**
    * Get the type of this geometry.
-   * @return {import("./GeometryType.js").default} Geometry type.
+   * @return {import("./Geometry.js").Type} Geometry type.
    * @api
    */
   Circle.prototype.getType = function () {
-    return GeometryType.CIRCLE;
+    return 'Circle';
   };
   /**
    * Test if the geometry and the passed extent intersect.
@@ -20396,11 +20440,11 @@ var LineString = /** @class */function (_super) {
   };
   /**
    * Get the type of this geometry.
-   * @return {import("./GeometryType.js").default} Geometry type.
+   * @return {import("./Geometry.js").Type} Geometry type.
    * @api
    */
   LineString.prototype.getType = function () {
-    return GeometryType.LINE_STRING;
+    return 'LineString';
   };
   /**
    * Test if the geometry and the passed extent intersect.
@@ -20650,11 +20694,11 @@ var MultiLineString = /** @class */function (_super) {
   };
   /**
    * Get the type of this geometry.
-   * @return {import("./GeometryType.js").default} Geometry type.
+   * @return {import("./Geometry.js").Type} Geometry type.
    * @api
    */
   MultiLineString.prototype.getType = function () {
-    return GeometryType.MULTI_LINE_STRING;
+    return 'MultiLineString';
   };
   /**
    * Test if the geometry and the passed extent intersect.
@@ -20813,11 +20857,11 @@ var MultiPoint = /** @class */function (_super) {
   };
   /**
    * Get the type of this geometry.
-   * @return {import("./GeometryType.js").default} Geometry type.
+   * @return {import("./Geometry.js").Type} Geometry type.
    * @api
    */
   MultiPoint.prototype.getType = function () {
-    return GeometryType.MULTI_POINT;
+    return 'MultiPoint';
   };
   /**
    * Test if the geometry and the passed extent intersect.
@@ -21177,11 +21221,11 @@ var MultiPolygon = /** @class */function (_super) {
   };
   /**
    * Get the type of this geometry.
-   * @return {import("./GeometryType.js").default} Geometry type.
+   * @return {import("./Geometry.js").Type} Geometry type.
    * @api
    */
   MultiPolygon.prototype.getType = function () {
-    return GeometryType.MULTI_POLYGON;
+    return 'MultiPolygon';
   };
   /**
    * Test if the geometry and the passed extent intersect.
@@ -21710,7 +21754,7 @@ var ImageState = {
  * @property {number} rotation Rotation.
  * @property {number|import("../size.js").Size} scale Scale.
  * @property {Array<number>} displacement Displacement.
- */
+ * @property {"declutter"|"obstacle"|"none"|undefined} declutterMode Declutter mode: `declutter`, `obstacle`, 'none */
 /**
  * @classdesc
  * A base class used for creating subclasses and not instantiated in
@@ -21754,6 +21798,11 @@ var ImageStyle = /** @class */function () {
      * @type {Array<number>}
      */
     this.displacement_ = options.displacement;
+    /**
+     * @private
+     * @type {"declutter"|"obstacle"|"none"|undefined}
+     */
+    this.declutterMode_ = options.declutterMode;
   }
   /**
    * Clones the style.
@@ -21767,7 +21816,8 @@ var ImageStyle = /** @class */function () {
       scale: Array.isArray(scale) ? scale.slice() : scale,
       rotation: this.getRotation(),
       rotateWithView: this.getRotateWithView(),
-      displacement: this.getDisplacement().slice()
+      displacement: this.getDisplacement().slice(),
+      declutterMode: this.getDeclutterMode()
     });
   };
   /**
@@ -21816,6 +21866,14 @@ var ImageStyle = /** @class */function () {
    */
   ImageStyle.prototype.getDisplacement = function () {
     return this.displacement_;
+  };
+  /**
+   * Get the declutter mode of the shape
+   * @return {"declutter"|"obstacle"|"none"|undefined} Shape's declutter mode
+   * @api
+   */
+  ImageStyle.prototype.getDeclutterMode = function () {
+    return this.declutterMode_;
   };
   /**
    * Get the anchor point in pixels. The anchor determines the center point for the
@@ -22016,6 +22074,7 @@ var __extends$B = undefined && undefined.__extends || function () {
  * @property {boolean} [rotateWithView=false] Whether to rotate the shape with the view.
  * @property {number|import("../size.js").Size} [scale=1] Scale. Unless two dimensional scaling is required a better
  * result may be obtained with appropriate settings for `radius`, `radius1` and `radius2`.
+ * @property {"declutter"|"obstacle"|"none"|undefined} [declutterMode] Declutter mode
  */
 /**
  * @typedef {Object} RenderOptions
@@ -22050,7 +22109,8 @@ var RegularShape = /** @class */function (_super) {
       rotateWithView: rotateWithView,
       rotation: options.rotation !== undefined ? options.rotation : 0,
       scale: options.scale !== undefined ? options.scale : 1,
-      displacement: options.displacement !== undefined ? options.displacement : [0, 0]
+      displacement: options.displacement !== undefined ? options.displacement : [0, 0],
+      declutterMode: options.declutterMode
     }) || this;
     /**
      * @private
@@ -22127,7 +22187,8 @@ var RegularShape = /** @class */function (_super) {
       rotation: this.getRotation(),
       rotateWithView: this.getRotateWithView(),
       scale: Array.isArray(scale) ? scale.slice() : scale,
-      displacement: this.getDisplacement().slice()
+      displacement: this.getDisplacement().slice(),
+      declutterMode: this.getDeclutterMode()
     });
     style.setOpacity(this.getOpacity());
     return style;
@@ -22161,6 +22222,15 @@ var RegularShape = /** @class */function (_super) {
    */
   RegularShape.prototype.getFill = function () {
     return this.fill_;
+  };
+  /**
+   * Set the fill style.
+   * @param {import("./Fill.js").default} fill Fill style.
+   * @api
+   */
+  RegularShape.prototype.setFill = function (fill) {
+    this.fill_ = fill;
+    this.render();
   };
   /**
    * @return {HTMLCanvasElement} Image element.
@@ -22255,6 +22325,15 @@ var RegularShape = /** @class */function (_super) {
    */
   RegularShape.prototype.getStroke = function () {
     return this.stroke_;
+  };
+  /**
+   * Set the stroke style.
+   * @param {import("./Stroke.js").default} stroke Stroke style.
+   * @api
+   */
+  RegularShape.prototype.setStroke = function (stroke) {
+    this.stroke_ = stroke;
+    this.render();
   };
   /**
    * @param {function(import("../events/Event.js").default): void} listener Listener function.
@@ -22551,6 +22630,7 @@ var __extends$A = undefined && undefined.__extends || function () {
  * (positive rotation clockwise, meaningful only when used in conjunction with a two dimensional scale).
  * @property {boolean} [rotateWithView=false] Whether to rotate the shape with the view
  * (meaningful only when used in conjunction with a two dimensional scale).
+ * @property {"declutter"|"obstacle"|"none"|undefined} [declutterMode] Declutter mode
  */
 /**
  * @classdesc
@@ -22572,7 +22652,8 @@ var CircleStyle = /** @class */function (_super) {
       scale: options.scale !== undefined ? options.scale : 1,
       rotation: options.rotation !== undefined ? options.rotation : 0,
       rotateWithView: options.rotateWithView !== undefined ? options.rotateWithView : false,
-      displacement: options.displacement !== undefined ? options.displacement : [0, 0]
+      displacement: options.displacement !== undefined ? options.displacement : [0, 0],
+      declutterMode: options.declutterMode
     }) || this;
   }
   /**
@@ -22589,7 +22670,8 @@ var CircleStyle = /** @class */function (_super) {
       scale: Array.isArray(scale) ? scale.slice() : scale,
       rotation: this.getRotation(),
       rotateWithView: this.getRotateWithView(),
-      displacement: this.getDisplacement().slice()
+      displacement: this.getDisplacement().slice(),
+      declutterMode: this.getDeclutterMode()
     });
     style.setOpacity(this.getOpacity());
     return style;
@@ -22905,8 +22987,7 @@ var Stroke = /** @class */function () {
  * 1. The pixel coordinates of the geometry in GeoJSON notation.
  * 2. The {@link module:ol/render~State} of the layer renderer.
  *
- * @typedef {function((import("../coordinate.js").Coordinate|Array<import("../coordinate.js").Coordinate>|Array<Array<import("../coordinate.js").Coordinate>>),import("../render.js").State): void}
- * RenderFunction
+ * @typedef {function((import("../coordinate.js").Coordinate|Array<import("../coordinate.js").Coordinate>|Array<Array<import("../coordinate.js").Coordinate>>),import("../render.js").State): void} RenderFunction
  */
 /**
  * @typedef {Object} Options
@@ -22956,23 +23037,22 @@ var Stroke = /** @class */function () {
  *
  * A separate editing style has the following defaults:
  * ```js
- *  import GeometryType from 'ol/geom/GeometryType';
  *  import {Circle, Fill, Stroke, Style} from 'ol/style';
  *
  *  const styles = {};
  *  const white = [255, 255, 255, 1];
  *  const blue = [0, 153, 255, 1];
  *  const width = 3;
- *  styles[GeometryType.POLYGON] = [
+ *  styles['Polygon'] = [
  *    new Style({
  *      fill: new Fill({
  *        color: [255, 255, 255, 0.5],
  *      }),
  *    }),
  *  ];
- *  styles[GeometryType.MULTI_POLYGON] = styles[GeometryType.POLYGON];
- *
- *  styles[GeometryType.LINE_STRING] = [
+ *  styles['MultiPolygon'] =
+ *      styles['Polygon'];
+ *  styles['LineString'] = [
  *    new Style({
  *      stroke: new Stroke({
  *        color: white,
@@ -22986,13 +23066,13 @@ var Stroke = /** @class */function () {
  *      }),
  *    }),
  *  ];
- *  styles[GeometryType.MULTI_LINE_STRING] = styles[GeometryType.LINE_STRING];
+ *  styles['MultiLineString'] = styles['LineString'];
  *
- *  styles[GeometryType.CIRCLE] = styles[GeometryType.POLYGON].concat(
- *    styles[GeometryType.LINE_STRING]
+ *  styles['Circle'] = styles['Polygon'].concat(
+ *    styles['LineString']
  *  );
  *
- *  styles[GeometryType.POINT] = [
+ *  styles['Point'] = [
  *    new Style({
  *      image: new Circle({
  *        radius: width * 2,
@@ -23007,11 +23087,13 @@ var Stroke = /** @class */function () {
  *      zIndex: Infinity,
  *    }),
  *  ];
- *  styles[GeometryType.MULTI_POINT] = styles[GeometryType.POINT];
- *
- *  styles[GeometryType.GEOMETRY_COLLECTION] = styles[
- *    GeometryType.POLYGON
- *  ].concat(styles[GeometryType.LINE_STRING], styles[GeometryType.POINT]);
+ *  styles['MultiPoint'] =
+ *      styles['Point'];
+ *  styles['GeometryCollection'] =
+ *      styles['Polygon'].concat(
+ *          styles['LineString'],
+ *          styles['Point']
+ *      );
  * ```
  *
  * @api
@@ -23322,21 +23404,21 @@ function createDefaultStyle(feature, resolution) {
 }
 /**
  * Default styles for editing features.
- * @return {Object<import("../geom/GeometryType.js").default, Array<Style>>} Styles
+ * @return {Object<import("../geom/Geometry.js").Type, Array<Style>>} Styles
  */
 function createEditingStyle() {
-  /** @type {Object<import("../geom/GeometryType.js").default, Array<Style>>} */
+  /** @type {Object<import("../geom/Geometry.js").Type, Array<Style>>} */
   var styles = {};
   var white = [255, 255, 255, 1];
   var blue = [0, 153, 255, 1];
   var width = 3;
-  styles[GeometryType.POLYGON] = [new Style({
+  styles['Polygon'] = [new Style({
     fill: new Fill({
       color: [255, 255, 255, 0.5]
     })
   })];
-  styles[GeometryType.MULTI_POLYGON] = styles[GeometryType.POLYGON];
-  styles[GeometryType.LINE_STRING] = [new Style({
+  styles['MultiPolygon'] = styles['Polygon'];
+  styles['LineString'] = [new Style({
     stroke: new Stroke({
       color: white,
       width: width + 2
@@ -23347,9 +23429,9 @@ function createEditingStyle() {
       width: width
     })
   })];
-  styles[GeometryType.MULTI_LINE_STRING] = styles[GeometryType.LINE_STRING];
-  styles[GeometryType.CIRCLE] = styles[GeometryType.POLYGON].concat(styles[GeometryType.LINE_STRING]);
-  styles[GeometryType.POINT] = [new Style({
+  styles['MultiLineString'] = styles['LineString'];
+  styles['Circle'] = styles['Polygon'].concat(styles['LineString']);
+  styles['Point'] = [new Style({
     image: new CircleStyle({
       radius: width * 2,
       fill: new Fill({
@@ -23362,8 +23444,8 @@ function createEditingStyle() {
     }),
     zIndex: Infinity
   })];
-  styles[GeometryType.MULTI_POINT] = styles[GeometryType.POINT];
-  styles[GeometryType.GEOMETRY_COLLECTION] = styles[GeometryType.POLYGON].concat(styles[GeometryType.LINE_STRING], styles[GeometryType.POINT]);
+  styles['MultiPoint'] = styles['Point'];
+  styles['GeometryCollection'] = styles['Polygon'].concat(styles['LineString'], styles['Point']);
   return styles;
 }
 /**
@@ -23973,7 +24055,7 @@ var CanvasBuilder = /** @class */function (_super) {
     var flatCoordinates, builderEnd, builderEnds, builderEndss;
     var offset;
     switch (type) {
-      case GeometryType.MULTI_POLYGON:
+      case 'MultiPolygon':
         flatCoordinates = /** @type {import("../../geom/MultiPolygon.js").default} */geometry.getOrientedFlatCoordinates();
         builderEndss = [];
         var endss = /** @type {import("../../geom/MultiPolygon.js").default} */geometry.getEndss();
@@ -23986,22 +24068,22 @@ var CanvasBuilder = /** @class */function (_super) {
         this.instructions.push([Instruction.CUSTOM, builderBegin, builderEndss, geometry, renderer, inflateMultiCoordinatesArray]);
         this.hitDetectionInstructions.push([Instruction.CUSTOM, builderBegin, builderEndss, geometry, hitDetectionRenderer || renderer, inflateMultiCoordinatesArray]);
         break;
-      case GeometryType.POLYGON:
-      case GeometryType.MULTI_LINE_STRING:
+      case 'Polygon':
+      case 'MultiLineString':
         builderEnds = [];
-        flatCoordinates = type == GeometryType.POLYGON ? /** @type {import("../../geom/Polygon.js").default} */geometry.getOrientedFlatCoordinates() : geometry.getFlatCoordinates();
+        flatCoordinates = type == 'Polygon' ? /** @type {import("../../geom/Polygon.js").default} */geometry.getOrientedFlatCoordinates() : geometry.getFlatCoordinates();
         offset = this.drawCustomCoordinates_(flatCoordinates, 0, /** @type {import("../../geom/Polygon.js").default|import("../../geom/MultiLineString.js").default} */geometry.getEnds(), stride, builderEnds);
         this.instructions.push([Instruction.CUSTOM, builderBegin, builderEnds, geometry, renderer, inflateCoordinatesArray]);
         this.hitDetectionInstructions.push([Instruction.CUSTOM, builderBegin, builderEnds, geometry, hitDetectionRenderer || renderer, inflateCoordinatesArray]);
         break;
-      case GeometryType.LINE_STRING:
-      case GeometryType.CIRCLE:
+      case 'LineString':
+      case 'Circle':
         flatCoordinates = geometry.getFlatCoordinates();
         builderEnd = this.appendFlatLineCoordinates(flatCoordinates, 0, flatCoordinates.length, stride, false, false);
         this.instructions.push([Instruction.CUSTOM, builderBegin, builderEnd, geometry, renderer, inflateCoordinates]);
         this.hitDetectionInstructions.push([Instruction.CUSTOM, builderBegin, builderEnd, geometry, hitDetectionRenderer || renderer, inflateCoordinates]);
         break;
-      case GeometryType.MULTI_POINT:
+      case 'MultiPoint':
         flatCoordinates = geometry.getFlatCoordinates();
         builderEnd = this.appendFlatPointCoordinates(flatCoordinates, stride);
         if (builderEnd > builderBegin) {
@@ -24009,7 +24091,7 @@ var CanvasBuilder = /** @class */function (_super) {
           this.hitDetectionInstructions.push([Instruction.CUSTOM, builderBegin, builderEnd, geometry, hitDetectionRenderer || renderer, inflateCoordinates]);
         }
         break;
-      case GeometryType.POINT:
+      case 'Point':
         flatCoordinates = geometry.getFlatCoordinates();
         this.coordinates.push(flatCoordinates[0], flatCoordinates[1]);
         builderEnd = this.coordinates.length;
@@ -24300,6 +24382,11 @@ var CanvasImageBuilder = /** @class */function (_super) {
      */
     _this.width_ = undefined;
     /**
+     * @private
+     * @type {"declutter"|"obstacle"|"none"|undefined}
+     */
+    _this.declutterMode_ = undefined;
+    /**
      * Data shared with a text builder for combined decluttering.
      * @private
      * @type {import("../canvas.js").DeclutterImageWithText}
@@ -24322,10 +24409,10 @@ var CanvasImageBuilder = /** @class */function (_super) {
     var myEnd = this.appendFlatPointCoordinates(flatCoordinates, stride);
     this.instructions.push([Instruction.DRAW_IMAGE, myBegin, myEnd, this.image_,
     // Remaining arguments to DRAW_IMAGE are in alphabetical order
-    this.anchorX_ * this.imagePixelRatio_, this.anchorY_ * this.imagePixelRatio_, Math.ceil(this.height_ * this.imagePixelRatio_), this.opacity_, this.originX_, this.originY_, this.rotateWithView_, this.rotation_, [this.scale_[0] * this.pixelRatio / this.imagePixelRatio_, this.scale_[1] * this.pixelRatio / this.imagePixelRatio_], Math.ceil(this.width_ * this.imagePixelRatio_), this.declutterImageWithText_]);
+    this.anchorX_ * this.imagePixelRatio_, this.anchorY_ * this.imagePixelRatio_, Math.ceil(this.height_ * this.imagePixelRatio_), this.opacity_, this.originX_ * this.imagePixelRatio_, this.originY_ * this.imagePixelRatio_, this.rotateWithView_, this.rotation_, [this.scale_[0] * this.pixelRatio / this.imagePixelRatio_, this.scale_[1] * this.pixelRatio / this.imagePixelRatio_], Math.ceil(this.width_ * this.imagePixelRatio_), this.declutterMode_, this.declutterImageWithText_]);
     this.hitDetectionInstructions.push([Instruction.DRAW_IMAGE, myBegin, myEnd, this.hitDetectionImage_,
     // Remaining arguments to DRAW_IMAGE are in alphabetical order
-    this.anchorX_, this.anchorY_, this.height_, this.opacity_, this.originX_, this.originY_, this.rotateWithView_, this.rotation_, this.scale_, this.width_, this.declutterImageWithText_]);
+    this.anchorX_, this.anchorY_, this.height_, this.opacity_, this.originX_, this.originY_, this.rotateWithView_, this.rotation_, this.scale_, this.width_, this.declutterMode_, this.declutterImageWithText_]);
     this.endGeometry(feature);
   };
   /**
@@ -24343,10 +24430,10 @@ var CanvasImageBuilder = /** @class */function (_super) {
     var myEnd = this.appendFlatPointCoordinates(flatCoordinates, stride);
     this.instructions.push([Instruction.DRAW_IMAGE, myBegin, myEnd, this.image_,
     // Remaining arguments to DRAW_IMAGE are in alphabetical order
-    this.anchorX_ * this.imagePixelRatio_, this.anchorY_ * this.imagePixelRatio_, Math.ceil(this.height_ * this.imagePixelRatio_), this.opacity_, this.originX_, this.originY_, this.rotateWithView_, this.rotation_, [this.scale_[0] * this.pixelRatio / this.imagePixelRatio_, this.scale_[1] * this.pixelRatio / this.imagePixelRatio_], Math.ceil(this.width_ * this.imagePixelRatio_), this.declutterImageWithText_]);
+    this.anchorX_ * this.imagePixelRatio_, this.anchorY_ * this.imagePixelRatio_, Math.ceil(this.height_ * this.imagePixelRatio_), this.opacity_, this.originX_ * this.imagePixelRatio_, this.originY_ * this.imagePixelRatio_, this.rotateWithView_, this.rotation_, [this.scale_[0] * this.pixelRatio / this.imagePixelRatio_, this.scale_[1] * this.pixelRatio / this.imagePixelRatio_], Math.ceil(this.width_ * this.imagePixelRatio_), this.declutterMode_, this.declutterImageWithText_]);
     this.hitDetectionInstructions.push([Instruction.DRAW_IMAGE, myBegin, myEnd, this.hitDetectionImage_,
     // Remaining arguments to DRAW_IMAGE are in alphabetical order
-    this.anchorX_, this.anchorY_, this.height_, this.opacity_, this.originX_, this.originY_, this.rotateWithView_, this.rotation_, this.scale_, this.width_, this.declutterImageWithText_]);
+    this.anchorX_, this.anchorY_, this.height_, this.opacity_, this.originX_, this.originY_, this.rotateWithView_, this.rotation_, this.scale_, this.width_, this.declutterMode_, this.declutterImageWithText_]);
     this.endGeometry(feature);
   };
   /**
@@ -24377,22 +24464,21 @@ var CanvasImageBuilder = /** @class */function (_super) {
   CanvasImageBuilder.prototype.setImageStyle = function (imageStyle, opt_sharedData) {
     var anchor = imageStyle.getAnchor();
     var size = imageStyle.getSize();
-    var hitDetectionImage = imageStyle.getHitDetectionImage();
-    var image = imageStyle.getImage(this.pixelRatio);
     var origin = imageStyle.getOrigin();
     this.imagePixelRatio_ = imageStyle.getPixelRatio(this.pixelRatio);
     this.anchorX_ = anchor[0];
     this.anchorY_ = anchor[1];
-    this.hitDetectionImage_ = hitDetectionImage;
-    this.image_ = image;
+    this.hitDetectionImage_ = imageStyle.getHitDetectionImage();
+    this.image_ = imageStyle.getImage(this.pixelRatio);
     this.height_ = size[1];
     this.opacity_ = imageStyle.getOpacity();
-    this.originX_ = origin[0] * this.imagePixelRatio_;
-    this.originY_ = origin[1] * this.imagePixelRatio_;
+    this.originX_ = origin[0];
+    this.originY_ = origin[1];
     this.rotateWithView_ = imageStyle.getRotateWithView();
     this.rotation_ = imageStyle.getRotation();
     this.scale_ = imageStyle.getScaleArray();
     this.width_ = size[0];
+    this.declutterMode_ = imageStyle.getDeclutterMode();
     this.declutterImageWithText_ = opt_sharedData;
   };
   return CanvasImageBuilder;
@@ -24929,19 +25015,19 @@ var CanvasTextBuilder = /** @class */function (_super) {
     var geometryType = geometry.getType();
     var flatCoordinates = null;
     var stride = geometry.getStride();
-    if (textState.placement === TextPlacement.LINE && (geometryType == GeometryType.LINE_STRING || geometryType == GeometryType.MULTI_LINE_STRING || geometryType == GeometryType.POLYGON || geometryType == GeometryType.MULTI_POLYGON)) {
+    if (textState.placement === TextPlacement.LINE && (geometryType == 'LineString' || geometryType == 'MultiLineString' || geometryType == 'Polygon' || geometryType == 'MultiPolygon')) {
       if (!intersects$1(this.getBufferedMaxExtent(), geometry.getExtent())) {
         return;
       }
       var ends = void 0;
       flatCoordinates = geometry.getFlatCoordinates();
-      if (geometryType == GeometryType.LINE_STRING) {
+      if (geometryType == 'LineString') {
         ends = [flatCoordinates.length];
-      } else if (geometryType == GeometryType.MULTI_LINE_STRING) {
+      } else if (geometryType == 'MultiLineString') {
         ends = /** @type {import("../../geom/MultiLineString.js").default} */geometry.getEnds();
-      } else if (geometryType == GeometryType.POLYGON) {
+      } else if (geometryType == 'Polygon') {
         ends = /** @type {import("../../geom/Polygon.js").default} */geometry.getEnds().slice(0, 1);
-      } else if (geometryType == GeometryType.MULTI_POLYGON) {
+      } else if (geometryType == 'MultiPolygon') {
         var endss = /** @type {import("../../geom/MultiPolygon.js").default} */geometry.getEndss();
         ends = [];
         for (var i = 0, ii = endss.length; i < ii; ++i) {
@@ -24950,6 +25036,7 @@ var CanvasTextBuilder = /** @class */function (_super) {
       }
       this.beginGeometry(geometry, feature);
       var textAlign = textState.textAlign;
+      // No `justify` support for line placement.
       var flatOffset = 0;
       var flatEnd = void 0;
       for (var o = 0, oo = ends.length; o < oo; ++o) {
@@ -24972,28 +25059,28 @@ var CanvasTextBuilder = /** @class */function (_super) {
     } else {
       var geometryWidths = textState.overflow ? null : [];
       switch (geometryType) {
-        case GeometryType.POINT:
-        case GeometryType.MULTI_POINT:
+        case 'Point':
+        case 'MultiPoint':
           flatCoordinates = /** @type {import("../../geom/MultiPoint.js").default} */geometry.getFlatCoordinates();
           break;
-        case GeometryType.LINE_STRING:
+        case 'LineString':
           flatCoordinates = /** @type {import("../../geom/LineString.js").default} */geometry.getFlatMidpoint();
           break;
-        case GeometryType.CIRCLE:
+        case 'Circle':
           flatCoordinates = /** @type {import("../../geom/Circle.js").default} */geometry.getCenter();
           break;
-        case GeometryType.MULTI_LINE_STRING:
+        case 'MultiLineString':
           flatCoordinates = /** @type {import("../../geom/MultiLineString.js").default} */geometry.getFlatMidpoints();
           stride = 2;
           break;
-        case GeometryType.POLYGON:
+        case 'Polygon':
           flatCoordinates = /** @type {import("../../geom/Polygon.js").default} */geometry.getFlatInteriorPoint();
           if (!textState.overflow) {
             geometryWidths.push(flatCoordinates[2] / this.resolution);
           }
           stride = 3;
           break;
-        case GeometryType.MULTI_POLYGON:
+        case 'MultiPolygon':
           var interiorPoints = /** @type {import("../../geom/MultiPolygon.js").default} */geometry.getFlatInteriorPoints();
           flatCoordinates = [];
           for (var i = 0, ii = interiorPoints.length; i < ii; i += 3) {
@@ -25056,11 +25143,11 @@ var CanvasTextBuilder = /** @class */function (_super) {
       // For clarity, we pass NaN for offsetX, offsetY, width and height, which will be computed at
       // render time.
       var pixelRatio_1 = this.pixelRatio;
-      this.instructions.push([Instruction.DRAW_IMAGE, begin, end, null, NaN, NaN, NaN, 1, 0, 0, this.textRotateWithView_, this.textRotation_, [1, 1], NaN, this.declutterImageWithText_, padding == defaultPadding ? defaultPadding : padding.map(function (p) {
+      this.instructions.push([Instruction.DRAW_IMAGE, begin, end, null, NaN, NaN, NaN, 1, 0, 0, this.textRotateWithView_, this.textRotation_, [1, 1], NaN, undefined, this.declutterImageWithText_, padding == defaultPadding ? defaultPadding : padding.map(function (p) {
         return p * pixelRatio_1;
       }), !!textState.backgroundFill, !!textState.backgroundStroke, this.text_, this.textKey_, this.strokeKey_, this.fillKey_, this.textOffsetX_, this.textOffsetY_, geometryWidths]);
       var scale = 1 / pixelRatio_1;
-      this.hitDetectionInstructions.push([Instruction.DRAW_IMAGE, begin, end, null, NaN, NaN, NaN, 1, 0, 0, this.textRotateWithView_, this.textRotation_, [scale, scale], NaN, this.declutterImageWithText_, padding, !!textState.backgroundFill, !!textState.backgroundStroke, this.text_, this.textKey_, this.strokeKey_, this.fillKey_, this.textOffsetX_, this.textOffsetY_, geometryWidths]);
+      this.hitDetectionInstructions.push([Instruction.DRAW_IMAGE, begin, end, null, NaN, NaN, NaN, 1, 0, 0, this.textRotateWithView_, this.textRotation_, [scale, scale], NaN, undefined, this.declutterImageWithText_, padding, !!textState.backgroundFill, !!textState.backgroundStroke, this.text_, this.textKey_, this.strokeKey_, this.fillKey_, this.textOffsetX_, this.textOffsetY_, geometryWidths]);
       this.endGeometry(feature);
     }
   };
@@ -25090,6 +25177,7 @@ var CanvasTextBuilder = /** @class */function (_super) {
       this.textStates[textKey] = {
         font: textState.font,
         textAlign: textState.textAlign || defaultTextAlign,
+        justify: textState.justify,
         textBaseline: textState.textBaseline || defaultTextBaseline,
         scale: textState.scale
       };
@@ -25175,6 +25263,7 @@ var CanvasTextBuilder = /** @class */function (_super) {
       textState.maxAngle = textStyle.getMaxAngle();
       textState.placement = textStyle.getPlacement();
       textState.textAlign = textStyle.getTextAlign();
+      textState.justify = textStyle.getJustify();
       textState.textBaseline = textStyle.getTextBaseline() || defaultTextBaseline;
       textState.backgroundFill = textStyle.getBackgroundFill();
       textState.backgroundStroke = textStyle.getBackgroundStroke();
@@ -25190,7 +25279,7 @@ var CanvasTextBuilder = /** @class */function (_super) {
       this.textRotateWithView_ = textRotateWithView === undefined ? false : textRotateWithView;
       this.textRotation_ = textRotation === undefined ? 0 : textRotation;
       this.strokeKey_ = strokeState ? (typeof strokeState.strokeStyle == 'string' ? strokeState.strokeStyle : getUid(strokeState.strokeStyle)) + strokeState.lineCap + strokeState.lineDashOffset + '|' + strokeState.lineWidth + strokeState.lineJoin + strokeState.miterLimit + '[' + strokeState.lineDash.join() + ']' : '';
-      this.textKey_ = textState.font + textState.scale + (textState.textAlign || '?') + (textState.textBaseline || '?');
+      this.textKey_ = textState.font + textState.scale + (textState.textAlign || '?') + (textState.justify || '?') + (textState.textBaseline || '?');
       this.fillKey_ = fillState ? typeof fillState.fillStyle == 'string' ? fillState.fillStyle : '|' + getUid(fillState.fillStyle) : '';
     }
     this.declutterImageWithText_ = opt_sharedData;
@@ -25202,7 +25291,7 @@ var CanvasTextBuilder = /** @class */function (_super) {
  * @module ol/render/canvas/BuilderGroup
  */
 /**
- * @type {Object<import("./BuilderType").default, typeof Builder>}
+ * @type {Object<import("../canvas.js").BuilderType, typeof Builder>}
  */
 var BATCH_CONSTRUCTORS = {
   'Circle': CanvasPolygonBuilder,
@@ -25242,12 +25331,12 @@ var BuilderGroup = /** @class */function () {
     this.resolution_ = resolution;
     /**
      * @private
-     * @type {!Object<string, !Object<import("./BuilderType").default, Builder>>}
+     * @type {!Object<string, !Object<import("../canvas.js").BuilderType, Builder>>}
      */
     this.buildersByZIndex_ = {};
   }
   /**
-   * @return {!Object<string, !Object<import("./BuilderType").default, import("./Builder.js").SerializableInstructions>>} The serializable instructions
+   * @return {!Object<string, !Object<import("../canvas.js").BuilderType, import("./Builder.js").SerializableInstructions>>} The serializable instructions
    */
   BuilderGroup.prototype.finish = function () {
     var builderInstructions = {};
@@ -25263,7 +25352,7 @@ var BuilderGroup = /** @class */function () {
   };
   /**
    * @param {number|undefined} zIndex Z index.
-   * @param {import("./BuilderType.js").default} builderType Replay type.
+   * @param {import("../canvas.js").BuilderType} builderType Replay type.
    * @return {import("../VectorContext.js").default} Replay.
    */
   BuilderGroup.prototype.getBuilder = function (zIndex, builderType) {
@@ -25473,7 +25562,7 @@ var LayerRenderer = /** @class */function (_super) {
    */
   LayerRenderer.prototype.renderIfReadyAndVisible = function () {
     var layer = this.getLayer();
-    if (layer.getVisible() && layer.getSourceState() == SourceState.READY) {
+    if (layer && layer.getVisible() && layer.getSourceState() === 'ready') {
       layer.changed();
     }
   };
@@ -25507,6 +25596,10 @@ var __extends$s = undefined && undefined.__extends || function () {
     d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
   };
 }();
+/**
+ * @type {Array<HTMLCanvasElement>}
+ */
+var canvasPool$1 = [];
 /**
  * @type {CanvasRenderingContext2D}
  */
@@ -25596,6 +25689,7 @@ var CanvasLayerRenderer = /** @class */function (_super) {
       pixelContext.drawImage(image, col, row, 1, 1, 0, 0, 1, 1);
       data = pixelContext.getImageData(0, 0, 1, 1).data;
     } catch (err) {
+      pixelContext = null;
       return null;
     }
     return data;
@@ -25616,13 +25710,12 @@ var CanvasLayerRenderer = /** @class */function (_super) {
    * Get a rendering container from an existing target, if compatible.
    * @param {HTMLElement} target Potential render target.
    * @param {string} transform CSS Transform.
-   * @param {number} opacity Opacity.
    * @param {string} [opt_backgroundColor] Background color.
    */
-  CanvasLayerRenderer.prototype.useContainer = function (target, transform, opacity, opt_backgroundColor) {
+  CanvasLayerRenderer.prototype.useContainer = function (target, transform, opt_backgroundColor) {
     var layerClassName = this.getLayer().getClassName();
     var container, context;
-    if (target && target.className === layerClassName && target.style.opacity === '' && opacity === 1 && (!opt_backgroundColor || target.style.backgroundColor && equals$2(asArray(target.style.backgroundColor), asArray(opt_backgroundColor)))) {
+    if (target && target.className === layerClassName && (!opt_backgroundColor || target && target.style.backgroundColor && equals$2(asArray(target.style.backgroundColor), asArray(opt_backgroundColor)))) {
       var canvas = target.firstElementChild;
       if (canvas instanceof HTMLCanvasElement) {
         context = canvas.getContext('2d');
@@ -25646,9 +25739,6 @@ var CanvasLayerRenderer = /** @class */function (_super) {
       style.position = 'absolute';
       style.width = '100%';
       style.height = '100%';
-      if (opt_backgroundColor) {
-        style.backgroundColor = opt_backgroundColor;
-      }
       context = createCanvasContext2D();
       var canvas = context.canvas;
       container.appendChild(canvas);
@@ -25658,6 +25748,9 @@ var CanvasLayerRenderer = /** @class */function (_super) {
       style.transformOrigin = 'top left';
       this.container = container;
       this.context = context;
+    }
+    if (!this.containerReused && opt_backgroundColor && !this.container.style.backgroundColor) {
+      this.container.style.backgroundColor = opt_backgroundColor;
     }
   };
   /**
@@ -25798,21 +25891,6 @@ var CanvasLayerRenderer = /** @class */function (_super) {
 }(LayerRenderer);
 
 /**
- * @module ol/render/canvas/BuilderType
- */
-/**
- * @enum {string}
- */
-var BuilderType = {
-  CIRCLE: 'Circle',
-  DEFAULT: 'Default',
-  IMAGE: 'Image',
-  LINE_STRING: 'LineString',
-  POLYGON: 'Polygon',
-  TEXT: 'Text'
-};
-
-/**
  * @module ol/geom/flat/textpath
  */
 /**
@@ -25892,6 +25970,8 @@ function drawTextOnPath(flatCoordinates, offset, end, stride, text, startM, maxA
     result[0] = [x, y, (endM - startM) / 2, previousAngle, text];
     return result;
   }
+  // rendering across line segments
+  text = text.replace(/\n/g, ' '); // ensure rendering in single-line as all calculations below don't handle multi-lines
   for (var i = 0, ii = text.length; i < ii;) {
     advance();
     var angle = Math.atan2(y2 - y1, x2 - x1);
@@ -26110,7 +26190,7 @@ var Executor = /** @class */function () {
     var pixelRatio = this.pixelRatio;
     var scale = [textState.scale[0] * pixelRatio, textState.scale[1] * pixelRatio];
     var textIsArray = Array.isArray(text);
-    var align = horizontalTextAlign(textIsArray ? text[0] : text, textState.textAlign || defaultTextAlign);
+    var align = textState.justify ? TEXT_ALIGN[textState.justify] : horizontalTextAlign(Array.isArray(text) ? text[0] : text, textState.textAlign || defaultTextAlign);
     var strokeWidth = strokeKey && strokeState.lineWidth ? strokeState.lineWidth : 0;
     var chunks = textIsArray ? text : text.split('\n').reduce(createTextChunks, []);
     var _a = getTextDimensions(textState, chunks),
@@ -26512,20 +26592,21 @@ var Executor = /** @class */function () {
           var rotation = /** @type {number} */instruction[11];
           var scale = /** @type {import("../../size.js").Size} */instruction[12];
           var width = /** @type {number} */instruction[13];
-          var declutterImageWithText = /** @type {import("../canvas.js").DeclutterImageWithText} */instruction[14];
-          if (!image && instruction.length >= 19) {
+          var declutterMode = /** @type {"declutter"|"obstacle"|"none"|undefined} */instruction[14];
+          var declutterImageWithText = /** @type {import("../canvas.js").DeclutterImageWithText} */instruction[15];
+          if (!image && instruction.length >= 20) {
             // create label images
-            text = /** @type {string} */instruction[18];
-            textKey = /** @type {string} */instruction[19];
-            strokeKey = /** @type {string} */instruction[20];
-            fillKey = /** @type {string} */instruction[21];
+            text = /** @type {string} */instruction[19];
+            textKey = /** @type {string} */instruction[20];
+            strokeKey = /** @type {string} */instruction[21];
+            fillKey = /** @type {string} */instruction[22];
             var labelWithAnchor = this.drawLabelWithPointPlacement_(text, textKey, strokeKey, fillKey);
             image = labelWithAnchor.label;
             instruction[3] = image;
-            var textOffsetX = /** @type {number} */instruction[22];
+            var textOffsetX = /** @type {number} */instruction[23];
             anchorX = (labelWithAnchor.anchorX - textOffsetX) * this.pixelRatio;
             instruction[4] = anchorX;
-            var textOffsetY = /** @type {number} */instruction[23];
+            var textOffsetY = /** @type {number} */instruction[24];
             anchorY = (labelWithAnchor.anchorY - textOffsetY) * this.pixelRatio;
             instruction[5] = anchorY;
             height = image.height;
@@ -26534,16 +26615,16 @@ var Executor = /** @class */function () {
             instruction[13] = width;
           }
           var geometryWidths = void 0;
-          if (instruction.length > 24) {
-            geometryWidths = /** @type {number} */instruction[24];
+          if (instruction.length > 25) {
+            geometryWidths = /** @type {number} */instruction[25];
           }
           var padding = void 0,
             backgroundFill = void 0,
             backgroundStroke = void 0;
-          if (instruction.length > 16) {
-            padding = /** @type {Array<number>} */instruction[15];
-            backgroundFill = /** @type {boolean} */instruction[16];
-            backgroundStroke = /** @type {boolean} */instruction[17];
+          if (instruction.length > 17) {
+            padding = /** @type {Array<number>} */instruction[16];
+            backgroundFill = /** @type {boolean} */instruction[17];
+            backgroundStroke = /** @type {boolean} */instruction[18];
           } else {
             padding = defaultPadding;
             backgroundFill = false;
@@ -26564,36 +26645,43 @@ var Executor = /** @class */function () {
             var dimensions = this.calculateImageOrLabelDimensions_(image.width, image.height, pixelCoordinates[d], pixelCoordinates[d + 1], width, height, anchorX, anchorY, originX, originY, rotation, scale, snapToPixel, padding, backgroundFill || backgroundStroke, feature);
             /** @type {ReplayImageOrLabelArgs} */
             var args = [context, contextScale, image, dimensions, opacity, backgroundFill ? /** @type {Array<*>} */lastFillInstruction : null, backgroundStroke ? /** @type {Array<*>} */lastStrokeInstruction : null];
-            var imageArgs = void 0;
-            var imageDeclutterBox = void 0;
-            if (opt_declutterTree && declutterImageWithText) {
-              var index = dd - d;
-              if (!declutterImageWithText[index]) {
-                // We now have the image for an image+text combination.
-                declutterImageWithText[index] = args;
-                // Don't render anything for now, wait for the text.
-                continue;
-              }
-              imageArgs = declutterImageWithText[index];
-              delete declutterImageWithText[index];
-              imageDeclutterBox = getDeclutterBox(imageArgs);
-              if (opt_declutterTree.collides(imageDeclutterBox)) {
-                continue;
-              }
-            }
-            if (opt_declutterTree && opt_declutterTree.collides(dimensions.declutterBox)) {
-              continue;
-            }
-            if (imageArgs) {
-              // We now have image and text for an image+text combination.
-              if (opt_declutterTree) {
-                opt_declutterTree.insert(imageDeclutterBox);
-              }
-              // Render the image before we render the text.
-              this.replayImageOrLabel_.apply(this, imageArgs);
-            }
             if (opt_declutterTree) {
-              opt_declutterTree.insert(dimensions.declutterBox);
+              if (declutterMode === 'none') {
+                // not rendered in declutter group
+                continue;
+              } else if (declutterMode === 'obstacle') {
+                // will always be drawn, thus no collision detection, but insert as obstacle
+                opt_declutterTree.insert(dimensions.declutterBox);
+                continue;
+              } else {
+                var imageArgs = void 0;
+                var imageDeclutterBox = void 0;
+                if (declutterImageWithText) {
+                  var index = dd - d;
+                  if (!declutterImageWithText[index]) {
+                    // We now have the image for an image+text combination.
+                    declutterImageWithText[index] = args;
+                    // Don't render anything for now, wait for the text.
+                    continue;
+                  }
+                  imageArgs = declutterImageWithText[index];
+                  delete declutterImageWithText[index];
+                  imageDeclutterBox = getDeclutterBox(imageArgs);
+                  if (opt_declutterTree.collides(imageDeclutterBox)) {
+                    continue;
+                  }
+                }
+                if (opt_declutterTree.collides(dimensions.declutterBox)) {
+                  continue;
+                }
+                if (imageArgs) {
+                  // We now have image and text for an image+text combination.
+                  opt_declutterTree.insert(imageDeclutterBox);
+                  // Render the image before we render the text.
+                  this.replayImageOrLabel_.apply(this, imageArgs);
+                }
+                opt_declutterTree.insert(dimensions.declutterBox);
+              }
             }
             this.replayImageOrLabel_.apply(this, args);
           }
@@ -26750,7 +26838,8 @@ var Executor = /** @class */function () {
           ++i;
           break;
         default:
-          ++i; // consume the instruction anyway, to avoid an infinite loop
+          // consume the instruction anyway, to avoid an infinite loop
+          ++i;
           break;
       }
     }
@@ -26796,9 +26885,9 @@ var Executor = /** @class */function () {
  */
 /**
  * @const
- * @type {Array<import("./BuilderType.js").default>}
+ * @type {Array<import("../canvas.js").BuilderType>}
  */
-var ORDER = [BuilderType.POLYGON, BuilderType.CIRCLE, BuilderType.LINE_STRING, BuilderType.IMAGE, BuilderType.TEXT, BuilderType.DEFAULT];
+var ORDER = ['Polygon', 'Circle', 'LineString', 'Image', 'Text', 'Default'];
 var ExecutorGroup = /** @class */function () {
   /**
    * @param {import("../../extent.js").Extent} maxExtent Max extent for clipping. When a
@@ -26808,7 +26897,7 @@ var ExecutorGroup = /** @class */function () {
    * @param {number} resolution Resolution.
    * @param {number} pixelRatio Pixel ratio.
    * @param {boolean} overlaps The executor group can have overlapping geometries.
-   * @param {!Object<string, !Object<import("./BuilderType.js").default, import("../canvas.js").SerializableInstructions>>} allInstructions
+   * @param {!Object<string, !Object<import("../canvas.js").BuilderType, import("../canvas.js").SerializableInstructions>>} allInstructions
    * The serializable instructions.
    * @param {number} [opt_renderBuffer] Optional rendering buffer.
    */
@@ -26840,7 +26929,7 @@ var ExecutorGroup = /** @class */function () {
     this.renderBuffer_ = opt_renderBuffer;
     /**
      * @private
-     * @type {!Object<string, !Object<import("./BuilderType.js").default, import("./Executor").default>>}
+     * @type {!Object<string, !Object<import("../canvas.js").BuilderType, import("./Executor").default>>}
      */
     this.executorsByZIndex_ = {};
     /**
@@ -26871,7 +26960,7 @@ var ExecutorGroup = /** @class */function () {
   /**
    * Create executors and populate them using the provided instructions.
    * @private
-   * @param {!Object<string, !Object<import("./BuilderType.js").default, import("../canvas.js").SerializableInstructions>>} allInstructions The serializable instructions
+   * @param {!Object<string, !Object<import("../canvas.js").BuilderType, import("../canvas.js").SerializableInstructions>>} allInstructions The serializable instructions
    */
   ExecutorGroup.prototype.createExecutors_ = function (allInstructions) {
     for (var zIndex in allInstructions) {
@@ -26888,7 +26977,7 @@ var ExecutorGroup = /** @class */function () {
     }
   };
   /**
-   * @param {Array<import("./BuilderType.js").default>} executors Executors.
+   * @param {Array<import("../canvas.js").BuilderType>} executors Executors.
    * @return {boolean} Has executors of the provided types.
    */
   ExecutorGroup.prototype.hasExecutors = function (executors) {
@@ -26947,7 +27036,7 @@ var ExecutorGroup = /** @class */function () {
       var imageData = context.getImageData(0, 0, contextSize, contextSize).data;
       for (var i_1 = 0, ii = indexes.length; i_1 < ii; i_1++) {
         if (imageData[indexes[i_1]] > 0) {
-          if (!declutteredFeatures || builderType !== BuilderType.IMAGE && builderType !== BuilderType.TEXT || declutteredFeatures.indexOf(feature) !== -1) {
+          if (!declutteredFeatures || builderType !== 'Image' && builderType !== 'Text' || declutteredFeatures.indexOf(feature) !== -1) {
             var idx = (indexes[i_1] - 3) / 4;
             var x = hitTolerance - idx % contextSize;
             var y = hitTolerance - (idx / contextSize | 0);
@@ -26984,7 +27073,7 @@ var ExecutorGroup = /** @class */function () {
   };
   /**
    * @param {import("../../transform.js").Transform} transform Transform.
-   * @return {Array<number>} Clip coordinates.
+   * @return {Array<number>|null} Clip coordinates.
    */
   ExecutorGroup.prototype.getClipCoords = function (transform) {
     var maxExtent = this.maxExtent_;
@@ -27011,7 +27100,7 @@ var ExecutorGroup = /** @class */function () {
    * @param {import("../../transform.js").Transform} transform Transform.
    * @param {number} viewRotation View rotation.
    * @param {boolean} snapToPixel Snap point symbols and test to integer pixel.
-   * @param {Array<import("./BuilderType.js").default>} [opt_builderTypes] Ordered replay types to replay.
+   * @param {Array<import("../canvas.js").BuilderType>} [opt_builderTypes] Ordered replay types to replay.
    *     Default is {@link module:ol/render/replay~ORDER}
    * @param {import("rbush").default} [opt_declutterTree] Declutter tree.
    */
@@ -27515,28 +27604,28 @@ var CanvasImmediateRenderer = /** @class */function (_super) {
   CanvasImmediateRenderer.prototype.drawGeometry = function (geometry) {
     var type = geometry.getType();
     switch (type) {
-      case GeometryType.POINT:
+      case 'Point':
         this.drawPoint( /** @type {import("../../geom/Point.js").default} */geometry);
         break;
-      case GeometryType.LINE_STRING:
+      case 'LineString':
         this.drawLineString( /** @type {import("../../geom/LineString.js").default} */geometry);
         break;
-      case GeometryType.POLYGON:
+      case 'Polygon':
         this.drawPolygon( /** @type {import("../../geom/Polygon.js").default} */geometry);
         break;
-      case GeometryType.MULTI_POINT:
+      case 'MultiPoint':
         this.drawMultiPoint( /** @type {import("../../geom/MultiPoint.js").default} */geometry);
         break;
-      case GeometryType.MULTI_LINE_STRING:
+      case 'MultiLineString':
         this.drawMultiLineString( /** @type {import("../../geom/MultiLineString.js").default} */geometry);
         break;
-      case GeometryType.MULTI_POLYGON:
+      case 'MultiPolygon':
         this.drawMultiPolygon( /** @type {import("../../geom/MultiPolygon.js").default} */geometry);
         break;
-      case GeometryType.GEOMETRY_COLLECTION:
+      case 'GeometryCollection':
         this.drawGeometryCollection( /** @type {import("../../geom/GeometryCollection.js").default} */geometry);
         break;
-      case GeometryType.CIRCLE:
+      case 'Circle':
         this.drawCircle( /** @type {import("../../geom/Circle.js").default} */geometry);
         break;
     }
@@ -28649,6 +28738,7 @@ var __extends$n = undefined && undefined.__extends || function () {
  * @property {import("../size.js").Size} [imgSize] Image size in pixels. Only required if `img` is set and `src` is not, and
  * for SVG images in Internet Explorer 11. The provided `imgSize` needs to match the actual size of the image.
  * @property {string} [src] Image source URI.
+ * @property {"declutter"|"obstacle"|"none"|undefined} [declutterMode] Declutter mode
  */
 /**
  * @classdesc
@@ -28684,7 +28774,8 @@ var Icon = /** @class */function (_super) {
       rotation: rotation,
       scale: scale,
       displacement: options.displacement !== undefined ? options.displacement : [0, 0],
-      rotateWithView: rotateWithView
+      rotateWithView: rotateWithView,
+      declutterMode: options.declutterMode
     }) || this;
     /**
      * @private
@@ -28793,7 +28884,9 @@ var Icon = /** @class */function (_super) {
       rotation: this.getRotation(),
       scale: Array.isArray(scale) ? scale.slice() : scale,
       size: this.size_ !== null ? this.size_.slice() : undefined,
-      src: this.getSrc()
+      src: this.getSrc(),
+      displacement: this.getDisplacement().slice(),
+      declutterMode: this.getDeclutterMode()
     });
   };
   /**
@@ -29053,10 +29146,10 @@ function createHitDetectionImageData(size, transforms, features, styleFunction, 
       if (!byGeometryType) {
         byGeometryType = {};
         featuresByZIndex[zIndex] = byGeometryType;
-        byGeometryType[GeometryType.POLYGON] = [];
-        byGeometryType[GeometryType.CIRCLE] = [];
-        byGeometryType[GeometryType.LINE_STRING] = [];
-        byGeometryType[GeometryType.POINT] = [];
+        byGeometryType['Polygon'] = [];
+        byGeometryType['Circle'] = [];
+        byGeometryType['LineString'] = [];
+        byGeometryType['Point'] = [];
       }
       byGeometryType[geometry.getType().replace('Multi', '')].push(geometry, style);
     }
@@ -29126,7 +29219,7 @@ function hitDetect(pixel, features, imageData) {
 var SIMPLIFY_TOLERANCE = 0.5;
 /**
  * @const
- * @type {Object<import("../geom/GeometryType.js").default,
+ * @type {Object<import("../geom/Geometry.js").Type,
  *                function(import("../render/canvas/BuilderGroup.js").default, import("../geom/Geometry.js").default,
  *                         import("../style/Style.js").default, Object): void>}
  */
@@ -29176,13 +29269,13 @@ function renderCircleGeometry(builderGroup, geometry, style, feature, opt_declut
   var fillStyle = style.getFill();
   var strokeStyle = style.getStroke();
   if (fillStyle || strokeStyle) {
-    var circleReplay = builderGroup.getBuilder(style.getZIndex(), BuilderType.CIRCLE);
+    var circleReplay = builderGroup.getBuilder(style.getZIndex(), 'Circle');
     circleReplay.setFillStrokeStyle(fillStyle, strokeStyle);
     circleReplay.drawCircle(geometry, feature);
   }
   var textStyle = style.getText();
   if (textStyle && textStyle.getText()) {
-    var textReplay = (opt_declutterBuilderGroup || builderGroup).getBuilder(style.getZIndex(), BuilderType.TEXT);
+    var textReplay = (opt_declutterBuilderGroup || builderGroup).getBuilder(style.getZIndex(), 'Text');
     textReplay.setTextStyle(textStyle);
     textReplay.drawText(geometry, feature);
   }
@@ -29208,7 +29301,6 @@ function renderFeature(replayGroup, feature, style, squaredTolerance, listener, 
       if (imageState == ImageState.IDLE) {
         imageStyle.load();
       }
-      imageState = imageStyle.getImageState();
       imageStyle.listenImageChange(listener);
       loading = true;
     }
@@ -29245,14 +29337,14 @@ function renderFeatureInternal(replayGroup, feature, style, squaredTolerance, op
  * @param {import("../Feature.js").FeatureLike} feature Feature.
  */
 function renderGeometry(replayGroup, geometry, style, feature) {
-  if (geometry.getType() == GeometryType.GEOMETRY_COLLECTION) {
+  if (geometry.getType() == 'GeometryCollection') {
     var geometries = /** @type {import("../geom/GeometryCollection.js").default} */geometry.getGeometries();
     for (var i = 0, ii = geometries.length; i < ii; ++i) {
       renderGeometry(replayGroup, geometries[i], style, feature);
     }
     return;
   }
-  var replay = replayGroup.getBuilder(style.getZIndex(), BuilderType.DEFAULT);
+  var replay = replayGroup.getBuilder(style.getZIndex(), 'Default');
   replay.drawCustom( /** @type {import("../geom/SimpleGeometry.js").default} */geometry, feature, style.getRenderer(), style.getHitDetectionRenderer());
 }
 /**
@@ -29280,13 +29372,13 @@ function renderGeometryCollectionGeometry(replayGroup, geometry, style, feature,
 function renderLineStringGeometry(builderGroup, geometry, style, feature, opt_declutterBuilderGroup) {
   var strokeStyle = style.getStroke();
   if (strokeStyle) {
-    var lineStringReplay = builderGroup.getBuilder(style.getZIndex(), BuilderType.LINE_STRING);
+    var lineStringReplay = builderGroup.getBuilder(style.getZIndex(), 'LineString');
     lineStringReplay.setFillStrokeStyle(null, strokeStyle);
     lineStringReplay.drawLineString(geometry, feature);
   }
   var textStyle = style.getText();
   if (textStyle && textStyle.getText()) {
-    var textReplay = (opt_declutterBuilderGroup || builderGroup).getBuilder(style.getZIndex(), BuilderType.TEXT);
+    var textReplay = (opt_declutterBuilderGroup || builderGroup).getBuilder(style.getZIndex(), 'Text');
     textReplay.setTextStyle(textStyle);
     textReplay.drawText(geometry, feature);
   }
@@ -29301,13 +29393,13 @@ function renderLineStringGeometry(builderGroup, geometry, style, feature, opt_de
 function renderMultiLineStringGeometry(builderGroup, geometry, style, feature, opt_declutterBuilderGroup) {
   var strokeStyle = style.getStroke();
   if (strokeStyle) {
-    var lineStringReplay = builderGroup.getBuilder(style.getZIndex(), BuilderType.LINE_STRING);
+    var lineStringReplay = builderGroup.getBuilder(style.getZIndex(), 'LineString');
     lineStringReplay.setFillStrokeStyle(null, strokeStyle);
     lineStringReplay.drawMultiLineString(geometry, feature);
   }
   var textStyle = style.getText();
   if (textStyle && textStyle.getText()) {
-    var textReplay = (opt_declutterBuilderGroup || builderGroup).getBuilder(style.getZIndex(), BuilderType.TEXT);
+    var textReplay = (opt_declutterBuilderGroup || builderGroup).getBuilder(style.getZIndex(), 'Text');
     textReplay.setTextStyle(textStyle);
     textReplay.drawText(geometry, feature);
   }
@@ -29323,13 +29415,13 @@ function renderMultiPolygonGeometry(builderGroup, geometry, style, feature, opt_
   var fillStyle = style.getFill();
   var strokeStyle = style.getStroke();
   if (strokeStyle || fillStyle) {
-    var polygonReplay = builderGroup.getBuilder(style.getZIndex(), BuilderType.POLYGON);
+    var polygonReplay = builderGroup.getBuilder(style.getZIndex(), 'Polygon');
     polygonReplay.setFillStrokeStyle(fillStyle, strokeStyle);
     polygonReplay.drawMultiPolygon(geometry, feature);
   }
   var textStyle = style.getText();
   if (textStyle && textStyle.getText()) {
-    var textReplay = (opt_declutterBuilderGroup || builderGroup).getBuilder(style.getZIndex(), BuilderType.TEXT);
+    var textReplay = (opt_declutterBuilderGroup || builderGroup).getBuilder(style.getZIndex(), 'Text');
     textReplay.setTextStyle(textStyle);
     textReplay.drawText(geometry, feature);
   }
@@ -29346,20 +29438,35 @@ function renderPointGeometry(builderGroup, geometry, style, feature, opt_declutt
   var textStyle = style.getText();
   /** @type {import("../render/canvas.js").DeclutterImageWithText} */
   var declutterImageWithText;
-  if (opt_declutterBuilderGroup) {
-    builderGroup = opt_declutterBuilderGroup;
-    declutterImageWithText = imageStyle && textStyle && textStyle.getText() ? {} : undefined;
-  }
   if (imageStyle) {
     if (imageStyle.getImageState() != ImageState.LOADED) {
       return;
     }
-    var imageReplay = builderGroup.getBuilder(style.getZIndex(), BuilderType.IMAGE);
+    var imageBuilderGroup = builderGroup;
+    if (opt_declutterBuilderGroup) {
+      var declutterMode = imageStyle.getDeclutterMode();
+      if (declutterMode !== 'none') {
+        imageBuilderGroup = opt_declutterBuilderGroup;
+        if (declutterMode === 'obstacle') {
+          // draw in non-declutter group:
+          var imageReplay_1 = builderGroup.getBuilder(style.getZIndex(), 'Image');
+          imageReplay_1.setImageStyle(imageStyle, declutterImageWithText);
+          imageReplay_1.drawPoint(geometry, feature);
+        } else if (textStyle && textStyle.getText()) {
+          declutterImageWithText = {};
+        }
+      }
+    }
+    var imageReplay = imageBuilderGroup.getBuilder(style.getZIndex(), 'Image');
     imageReplay.setImageStyle(imageStyle, declutterImageWithText);
     imageReplay.drawPoint(geometry, feature);
   }
   if (textStyle && textStyle.getText()) {
-    var textReplay = builderGroup.getBuilder(style.getZIndex(), BuilderType.TEXT);
+    var textBuilderGroup = builderGroup;
+    if (opt_declutterBuilderGroup) {
+      textBuilderGroup = opt_declutterBuilderGroup;
+    }
+    var textReplay = textBuilderGroup.getBuilder(style.getZIndex(), 'Text');
     textReplay.setTextStyle(textStyle, declutterImageWithText);
     textReplay.drawText(geometry, feature);
   }
@@ -29376,20 +29483,35 @@ function renderMultiPointGeometry(builderGroup, geometry, style, feature, opt_de
   var textStyle = style.getText();
   /** @type {import("../render/canvas.js").DeclutterImageWithText} */
   var declutterImageWithText;
-  if (opt_declutterBuilderGroup) {
-    builderGroup = opt_declutterBuilderGroup;
-    declutterImageWithText = imageStyle && textStyle && textStyle.getText() ? {} : undefined;
-  }
   if (imageStyle) {
     if (imageStyle.getImageState() != ImageState.LOADED) {
       return;
     }
-    var imageReplay = builderGroup.getBuilder(style.getZIndex(), BuilderType.IMAGE);
+    var imageBuilderGroup = builderGroup;
+    if (opt_declutterBuilderGroup) {
+      var declutterMode = imageStyle.getDeclutterMode();
+      if (declutterMode !== 'none') {
+        imageBuilderGroup = opt_declutterBuilderGroup;
+        if (declutterMode === 'obstacle') {
+          // draw in non-declutter group:
+          var imageReplay_2 = builderGroup.getBuilder(style.getZIndex(), 'Image');
+          imageReplay_2.setImageStyle(imageStyle, declutterImageWithText);
+          imageReplay_2.drawMultiPoint(geometry, feature);
+        } else if (textStyle && textStyle.getText()) {
+          declutterImageWithText = {};
+        }
+      }
+    }
+    var imageReplay = imageBuilderGroup.getBuilder(style.getZIndex(), 'Image');
     imageReplay.setImageStyle(imageStyle, declutterImageWithText);
     imageReplay.drawMultiPoint(geometry, feature);
   }
   if (textStyle && textStyle.getText()) {
-    var textReplay = (opt_declutterBuilderGroup || builderGroup).getBuilder(style.getZIndex(), BuilderType.TEXT);
+    var textBuilderGroup = builderGroup;
+    if (opt_declutterBuilderGroup) {
+      textBuilderGroup = opt_declutterBuilderGroup;
+    }
+    var textReplay = textBuilderGroup.getBuilder(style.getZIndex(), 'Text');
     textReplay.setTextStyle(textStyle, declutterImageWithText);
     textReplay.drawText(geometry, feature);
   }
@@ -29405,13 +29527,13 @@ function renderPolygonGeometry(builderGroup, geometry, style, feature, opt_declu
   var fillStyle = style.getFill();
   var strokeStyle = style.getStroke();
   if (fillStyle || strokeStyle) {
-    var polygonReplay = builderGroup.getBuilder(style.getZIndex(), BuilderType.POLYGON);
+    var polygonReplay = builderGroup.getBuilder(style.getZIndex(), 'Polygon');
     polygonReplay.setFillStrokeStyle(fillStyle, strokeStyle);
     polygonReplay.drawPolygon(geometry, feature);
   }
   var textStyle = style.getText();
   if (textStyle && textStyle.getText()) {
-    var textReplay = (opt_declutterBuilderGroup || builderGroup).getBuilder(style.getZIndex(), BuilderType.TEXT);
+    var textReplay = (opt_declutterBuilderGroup || builderGroup).getBuilder(style.getZIndex(), 'Text');
     textReplay.setTextStyle(textStyle);
     textReplay.drawText(geometry, feature);
   }
@@ -29455,11 +29577,6 @@ var CanvasVectorLayerRenderer = /** @class */function (_super) {
      * @type {boolean}
      */
     _this.animatingOrInteracting_;
-    /**
-     * @private
-     * @type {boolean}
-     */
-    _this.dirty_ = false;
     /**
      * @type {ImageData}
      */
@@ -29527,6 +29644,16 @@ var CanvasVectorLayerRenderer = /** @class */function (_super) {
      * @type {boolean}
      */
     _this.clipping = true;
+    /**
+     * @private
+     * @type {CanvasRenderingContext2D}
+     */
+    _this.compositionContext_ = null;
+    /**
+     * @private
+     * @type {number}
+     */
+    _this.opacity_ = 1;
     return _this;
   }
   /**
@@ -29546,7 +29673,7 @@ var CanvasVectorLayerRenderer = /** @class */function (_super) {
     var pixelRatio = frameState.pixelRatio;
     var viewHints = frameState.viewHints;
     var snapToPixel = !(viewHints[ViewHint.ANIMATING] || viewHints[ViewHint.INTERACTING]);
-    var context = this.context;
+    var context = this.compositionContext_;
     var width = Math.round(frameState.size[0] * pixelRatio);
     var height = Math.round(frameState.size[1] * pixelRatio);
     var multiWorld = vectorSource.getWrapX() && projection.canWrapX();
@@ -29558,13 +29685,34 @@ var CanvasVectorLayerRenderer = /** @class */function (_super) {
       executorGroup.execute(context, 1, transform, rotation, snapToPixel, undefined, opt_declutterTree);
     } while (++world < endWorld);
   };
+  CanvasVectorLayerRenderer.prototype.setupCompositionContext_ = function () {
+    if (this.opacity_ !== 1) {
+      var compositionContext = createCanvasContext2D(this.context.canvas.width, this.context.canvas.height, canvasPool$1);
+      this.compositionContext_ = compositionContext;
+    } else {
+      this.compositionContext_ = this.context;
+    }
+  };
+  CanvasVectorLayerRenderer.prototype.releaseCompositionContext_ = function () {
+    if (this.opacity_ !== 1) {
+      var alpha = this.context.globalAlpha;
+      this.context.globalAlpha = this.opacity_;
+      this.context.drawImage(this.compositionContext_.canvas, 0, 0);
+      this.context.globalAlpha = alpha;
+      releaseCanvas(this.compositionContext_);
+      canvasPool$1.push(this.compositionContext_.canvas);
+      this.compositionContext_ = null;
+    }
+  };
   /**
    * Render declutter items for this layer
    * @param {import("../../PluggableMap.js").FrameState} frameState Frame state.
    */
   CanvasVectorLayerRenderer.prototype.renderDeclutter = function (frameState) {
     if (this.declutterExecutorGroup) {
+      this.setupCompositionContext_();
       this.renderWorlds(this.declutterExecutorGroup, frameState, frameState.declutterTree);
+      this.releaseCompositionContext_();
     }
   };
   /**
@@ -29580,7 +29728,7 @@ var CanvasVectorLayerRenderer = /** @class */function (_super) {
     makeScale(this.pixelTransform, 1 / pixelRatio, 1 / pixelRatio);
     makeInverse(this.inversePixelTransform, this.pixelTransform);
     var canvasTransform = toString$1(this.pixelTransform);
-    this.useContainer(target, canvasTransform, layerState.opacity, this.getBackground(frameState));
+    this.useContainer(target, canvasTransform, this.getBackground(frameState));
     var context = this.context;
     var canvas = context.canvas;
     var replayGroup = this.replayGroup_;
@@ -29603,6 +29751,8 @@ var CanvasVectorLayerRenderer = /** @class */function (_super) {
     this.preRender(context, frameState);
     var viewState = frameState.viewState;
     viewState.projection;
+    this.opacity_ = layerState.opacity;
+    this.setupCompositionContext_();
     // clipped rendering if layer extent is set
     var clipped = false;
     var render = true;
@@ -29611,21 +29761,17 @@ var CanvasVectorLayerRenderer = /** @class */function (_super) {
       render = intersects$1(layerExtent, frameState.extent);
       clipped = render && !containsExtent(layerExtent, frameState.extent);
       if (clipped) {
-        this.clipUnrotated(context, frameState, layerExtent);
+        this.clipUnrotated(this.compositionContext_, frameState, layerExtent);
       }
     }
     if (render) {
       this.renderWorlds(replayGroup, frameState);
     }
     if (clipped) {
-      context.restore();
+      this.compositionContext_.restore();
     }
+    this.releaseCompositionContext_();
     this.postRender(context, frameState);
-    var opacity = cssOpacity(layerState.opacity);
-    var container = this.container;
-    if (opacity !== container.style.opacity) {
-      container.style.opacity = opacity;
-    }
     if (this.renderedRotation_ !== viewState.rotation) {
       this.renderedRotation_ = viewState.rotation;
       this.hitDetectionImageData_ = null;
@@ -29779,7 +29925,7 @@ var CanvasVectorLayerRenderer = /** @class */function (_super) {
     var interacting = frameState.viewHints[ViewHint.INTERACTING];
     var updateWhileAnimating = vectorLayer.getUpdateWhileAnimating();
     var updateWhileInteracting = vectorLayer.getUpdateWhileInteracting();
-    if (!this.dirty_ && !updateWhileAnimating && animating || !updateWhileInteracting && interacting) {
+    if (this.ready && !updateWhileAnimating && animating || !updateWhileInteracting && interacting) {
       this.animatingOrInteracting_ = true;
       return true;
     }
@@ -29819,7 +29965,7 @@ var CanvasVectorLayerRenderer = /** @class */function (_super) {
         loadExtents.push([loadExtent[0] - worldWidth, loadExtent[1], loadExtent[2] - worldWidth, loadExtent[3]]);
       }
     }
-    if (!this.dirty_ && this.renderedResolution_ == resolution && this.renderedRevision_ == vectorLayerRevision && this.renderedRenderOrder_ == vectorLayerRenderOrder && containsExtent(this.wrappedRenderedExtent_, extent)) {
+    if (this.ready && this.renderedResolution_ == resolution && this.renderedRevision_ == vectorLayerRevision && this.renderedRenderOrder_ == vectorLayerRenderOrder && containsExtent(this.wrappedRenderedExtent_, extent)) {
       if (!equals$2(this.renderedExtent_, renderedExtent)) {
         this.hitDetectionImageData_ = null;
         this.renderedExtent_ = renderedExtent;
@@ -29829,7 +29975,6 @@ var CanvasVectorLayerRenderer = /** @class */function (_super) {
       return true;
     }
     this.replayGroup_ = null;
-    this.dirty_ = false;
     var replayGroup = new BuilderGroup(getTolerance(resolution, pixelRatio), extent, resolution, pixelRatio);
     var declutterBuilderGroup;
     if (this.getLayer().getDeclutter()) {
@@ -29842,6 +29987,7 @@ var CanvasVectorLayerRenderer = /** @class */function (_super) {
       }
     }
     var squaredTolerance = getSquaredTolerance(resolution, pixelRatio);
+    var ready = true;
     var render =
     /**
      * @param {import("../../Feature.js").default} feature Feature.
@@ -29855,7 +30001,7 @@ var CanvasVectorLayerRenderer = /** @class */function (_super) {
       }
       if (styles) {
         var dirty = this.renderFeature(feature, squaredTolerance, styles, replayGroup, userTransform, declutterBuilderGroup);
-        this.dirty_ = this.dirty_ || dirty;
+        ready = ready && !dirty;
       }
     }.bind(this);
     var userExtent = toUserExtent(extent);
@@ -29868,6 +30014,7 @@ var CanvasVectorLayerRenderer = /** @class */function (_super) {
       render(features[i]);
     }
     this.renderedFeatures_ = features;
+    this.ready = ready;
     var replayGroupInstructions = replayGroup.finish();
     var executorGroup = new ExecutorGroup(extent, resolution, pixelRatio, vectorSource.getOverlaps(), replayGroupInstructions, vectorLayer.getRenderBuffer());
     if (declutterBuilderGroup) {
@@ -30178,6 +30325,10 @@ var __extends$k = undefined && undefined.__extends || function () {
   };
 }();
 /**
+ * @typedef {'undefined' | 'loading' | 'ready' | 'error'} State
+ * State of the source, one of 'undefined', 'loading', 'ready' or 'error'.
+ */
+/**
  * A function that takes a {@link module:ol/PluggableMap~FrameState} and returns a string or
  * an array of strings representing source attributions.
  *
@@ -30198,7 +30349,7 @@ var __extends$k = undefined && undefined.__extends || function () {
  * @property {AttributionLike} [attributions] Attributions.
  * @property {boolean} [attributionsCollapsible=true] Attributions are collapsible.
  * @property {import("../proj.js").ProjectionLike} [projection] Projection. Default is the view projection.
- * @property {import("./State.js").default} [state='ready'] State.
+ * @property {import("./Source.js").State} [state='ready'] State.
  * @property {boolean} [wrapX=false] WrapX.
  * @property {boolean} [interpolate=false] Use interpolated values when resampling.  By default,
  * the nearest neighbor is used when resampling.
@@ -30222,7 +30373,7 @@ var Source = /** @class */function (_super) {
     var _this = _super.call(this) || this;
     /**
      * @protected
-     * @type {import("../proj/Projection.js").default}
+     * @type {import("../proj/Projection.js").default|null}
      */
     _this.projection = get$1(options.projection);
     /**
@@ -30243,9 +30394,9 @@ var Source = /** @class */function (_super) {
     _this.loading = false;
     /**
      * @private
-     * @type {import("./State.js").default}
+     * @type {import("./Source.js").State}
      */
-    _this.state_ = options.state !== undefined ? options.state : SourceState.READY;
+    _this.state_ = options.state !== undefined ? options.state : 'ready';
     /**
      * @private
      * @type {boolean}
@@ -30294,7 +30445,7 @@ var Source = /** @class */function (_super) {
   };
   /**
    * Get the projection of the source.
-   * @return {import("../proj/Projection.js").default} Projection.
+   * @return {import("../proj/Projection.js").default|null} Projection.
    * @api
    */
   Source.prototype.getProjection = function () {
@@ -30314,8 +30465,8 @@ var Source = /** @class */function (_super) {
     return this.viewPromise_;
   };
   /**
-   * Get the state of the source, see {@link module:ol/source/State~State} for possible states.
-   * @return {import("./State.js").default} State.
+   * Get the state of the source, see {@link import("./Source.js").State} for possible states.
+   * @return {import("./Source.js").State} State.
    * @api
    */
   Source.prototype.getState = function () {
@@ -30353,7 +30504,7 @@ var Source = /** @class */function (_super) {
   };
   /**
    * Set the state of the source.
-   * @param {import("./State.js").default} state State.
+   * @param {import("./Source.js").State} state State.
    */
   Source.prototype.setState = function (state) {
     this.state_ = state;
@@ -30508,7 +30659,7 @@ var withCredentials = false;
 function loadFeaturesXhr(url, format, extent, resolution, projection, success, failure) {
   var xhr = new XMLHttpRequest();
   xhr.open('GET', typeof url === 'function' ? url(extent, resolution, projection) : url, true);
-  if (format.getType() == FormatType.ARRAY_BUFFER) {
+  if (format.getType() == 'arraybuffer') {
     xhr.responseType = 'arraybuffer';
   }
   xhr.withCredentials = withCredentials;
@@ -30522,14 +30673,14 @@ function loadFeaturesXhr(url, format, extent, resolution, projection, success, f
       var type = format.getType();
       /** @type {Document|Node|Object|string|undefined} */
       var source = void 0;
-      if (type == FormatType.JSON || type == FormatType.TEXT) {
+      if (type == 'json' || type == 'text') {
         source = xhr.responseText;
-      } else if (type == FormatType.XML) {
+      } else if (type == 'xml') {
         source = xhr.responseXML;
         if (!source) {
           source = new DOMParser().parseFromString(xhr.responseText, 'application/xml');
         }
-      } else if (type == FormatType.ARRAY_BUFFER) {
+      } else if (type == 'arraybuffer') {
         source = /** @type {ArrayBuffer} */xhr.response;
       }
       if (source) {
@@ -30771,7 +30922,7 @@ var VectorSource = /** @class */function (_super) {
       attributions: options.attributions,
       interpolate: true,
       projection: undefined,
-      state: SourceState.READY,
+      state: 'ready',
       wrapX: options.wrapX !== undefined ? options.wrapX : true
     }) || this;
     /***
@@ -31238,12 +31389,22 @@ var VectorSource = /** @class */function (_super) {
    * features.
    *
    * @param {import("../extent.js").Extent} extent Extent.
+   * @param {import("../proj/Projection.js").default} [opt_projection] Include features
+   * where `extent` exceeds the x-axis bounds of `projection` and wraps around the world.
    * @return {Array<import("../Feature.js").default<Geometry>>} Features.
    * @api
    */
-  VectorSource.prototype.getFeaturesInExtent = function (extent) {
+  VectorSource.prototype.getFeaturesInExtent = function (extent, opt_projection) {
+    var _this = this;
     if (this.featuresRtree_) {
-      return this.featuresRtree_.getInExtent(extent);
+      var multiWorld = opt_projection && opt_projection.canWrapX() && this.getWrapX();
+      if (!multiWorld) {
+        return this.featuresRtree_.getInExtent(extent);
+      }
+      var extents = wrapAndSliceX(extent, opt_projection);
+      return [].concat.apply([], extents.map(function (anExtent) {
+        return _this.featuresRtree_.getInExtent(anExtent);
+      }));
     } else if (this.featuresCollection_) {
       return this.featuresCollection_.getArray().slice(0);
     } else {
@@ -31601,7 +31762,7 @@ var __extends$i = undefined && undefined.__extends || function () {
 }();
 /**
  * @typedef {Object} Options
- * @property {import("../geom/GeometryType.js").default} type Geometry type of
+ * @property {import("../geom/Geometry.js").Type} type Geometry type of
  * the geometries being drawn with this instance.
  * @property {number} [clickTolerance=6] The maximum distance in pixels between
  * "down" and "up" for a "up" event to be considered a "click" event and
@@ -31650,6 +31811,8 @@ var __extends$i = undefined && undefined.__extends || function () {
  * Shift key activates freehand drawing.
  * @property {boolean} [wrapX=false] Wrap the world horizontally on the sketch
  * overlay.
+ * @property {GeometryLayout} [geometryLayout='XY'] Layout of the
+ * feature geometries created by the draw interaction.
  */
 /**
  * Coordinate type when drawing points.
@@ -31824,10 +31987,10 @@ var DrawEvent = /** @class */function (_super) {
     _this.snapTolerance_ = options.snapTolerance ? options.snapTolerance : 12;
     /**
      * Geometry type.
-     * @type {import("../geom/GeometryType.js").default}
+     * @type {import("../geom/Geometry.js").Type}
      * @private
      */
-    _this.type_ = /** @type {import("../geom/GeometryType.js").default} */options.type;
+    _this.type_ = /** @type {import("../geom/Geometry.js").Type} */options.type;
     /**
      * Drawing mode (derived from geometry type.
      * @type {Mode}
@@ -31862,6 +32025,11 @@ var DrawEvent = /** @class */function (_super) {
      * @type {import("../events/condition.js").Condition}
      */
     _this.finishCondition_ = options.finishCondition ? options.finishCondition : TRUE;
+    /**
+     * @private
+     * @type {import("../geom/GeometryLayout").default}
+     */
+    _this.geometryLayout_ = options.geometryLayout ? options.geometryLayout : GeometryLayout.XY;
     var geometryFunction = options.geometryFunction;
     if (!geometryFunction) {
       var mode_1 = _this.mode_;
@@ -31876,7 +32044,7 @@ var DrawEvent = /** @class */function (_super) {
           var circle = geometry ? /** @type {Circle} */geometry : new Circle([NaN, NaN]);
           var center = fromUserCoordinate(coordinates[0]);
           var squaredLength = squaredDistance(center, fromUserCoordinate(coordinates[coordinates.length - 1]));
-          circle.setCenterAndRadius(center, Math.sqrt(squaredLength));
+          circle.setCenterAndRadius(center, Math.sqrt(squaredLength), this.geometryLayout_);
           return circle;
         };
       } else {
@@ -31899,15 +32067,15 @@ var DrawEvent = /** @class */function (_super) {
             if (mode_1 === Mode.POLYGON) {
               if (coordinates[0].length) {
                 // Add a closing coordinate to match the first
-                geometry.setCoordinates([coordinates[0].concat([coordinates[0][0]])]);
+                geometry.setCoordinates([coordinates[0].concat([coordinates[0][0]])], this.geometryLayout_);
               } else {
-                geometry.setCoordinates([]);
+                geometry.setCoordinates([], this.geometryLayout_);
               }
             } else {
-              geometry.setCoordinates(coordinates);
+              geometry.setCoordinates(coordinates, this.geometryLayout_);
             }
           } else {
-            geometry = new Constructor_1(coordinates);
+            geometry = new Constructor_1(coordinates, this.geometryLayout_);
           }
           return geometry;
         };
@@ -32239,6 +32407,10 @@ var DrawEvent = /** @class */function (_super) {
    */
   Draw.prototype.startDrawing_ = function (start) {
     var projection = this.getMap().getView().getProjection();
+    var stride = getStrideForLayout(this.geometryLayout_);
+    while (start.length < stride) {
+      start.push(0);
+    }
     this.finishCoordinate_ = start;
     if (this.mode_ === Mode.POINT) {
       this.sketchCoords_ = start.slice();
@@ -32269,7 +32441,11 @@ var DrawEvent = /** @class */function (_super) {
     var map = this.getMap();
     var geometry = this.sketchFeature_.getGeometry();
     var projection = map.getView().getProjection();
+    var stride = getStrideForLayout(this.geometryLayout_);
     var coordinates, last;
+    while (coordinate.length < stride) {
+      coordinate.push(0);
+    }
     if (this.mode_ === Mode.POINT) {
       last = this.sketchCoords_;
     } else if (this.mode_ === Mode.POLYGON) {
@@ -32290,7 +32466,7 @@ var DrawEvent = /** @class */function (_super) {
       var sketchPointGeom = this.sketchPoint_.getGeometry();
       sketchPointGeom.setCoordinates(coordinate);
     }
-    if (geometry.getType() === GeometryType.POLYGON && this.mode_ !== Mode.POLYGON) {
+    if (geometry.getType() === 'Polygon' && this.mode_ !== Mode.POLYGON) {
       this.createOrUpdateCustomSketchLine_( /** @type {Polygon} */geometry);
     } else if (this.sketchLineCoords_) {
       var sketchLineGeom = this.sketchLine_.getGeometry();
@@ -32365,7 +32541,7 @@ var DrawEvent = /** @class */function (_super) {
         this.createOrUpdateSketchPoint_(finishCoordinate);
       }
       this.geometryFunction_(coordinates, geometry, projection);
-      if (geometry.getType() === GeometryType.POLYGON && this.sketchLine_) {
+      if (geometry.getType() === 'Polygon' && this.sketchLine_) {
         this.createOrUpdateCustomSketchLine_( /** @type {Polygon} */geometry);
       }
     } else if (mode === Mode.POLYGON) {
@@ -32411,11 +32587,11 @@ var DrawEvent = /** @class */function (_super) {
       coordinates = geometry.getCoordinates();
     }
     // cast multi-part geometries
-    if (this.type_ === GeometryType.MULTI_POINT) {
+    if (this.type_ === 'MultiPoint') {
       sketchFeature.setGeometry(new MultiPoint([/** @type {PointCoordType} */coordinates]));
-    } else if (this.type_ === GeometryType.MULTI_LINE_STRING) {
+    } else if (this.type_ === 'MultiLineString') {
       sketchFeature.setGeometry(new MultiLineString([/** @type {LineCoordType} */coordinates]));
-    } else if (this.type_ === GeometryType.MULTI_POLYGON) {
+    } else if (this.type_ === 'MultiPolygon') {
       sketchFeature.setGeometry(new MultiPolygon([/** @type {PolyCoordType} */coordinates]));
     }
     // First dispatch event to allow full set up of feature
@@ -32558,21 +32734,21 @@ function getDefaultStyleFunction$2() {
 /**
  * Get the drawing mode.  The mode for multi-part geometries is the same as for
  * their single-part cousins.
- * @param {import("../geom/GeometryType.js").default} type Geometry type.
+ * @param {import("../geom/Geometry.js").Type} type Geometry type.
  * @return {Mode} Drawing mode.
  */
 function getMode(type) {
   switch (type) {
-    case GeometryType.POINT:
-    case GeometryType.MULTI_POINT:
+    case 'Point':
+    case 'MultiPoint':
       return Mode.POINT;
-    case GeometryType.LINE_STRING:
-    case GeometryType.MULTI_LINE_STRING:
+    case 'LineString':
+    case 'MultiLineString':
       return Mode.LINE_STRING;
-    case GeometryType.POLYGON:
-    case GeometryType.MULTI_POLYGON:
+    case 'Polygon':
+    case 'MultiPolygon':
       return Mode.POLYGON;
-    case GeometryType.CIRCLE:
+    case 'Circle':
       return Mode.CIRCLE;
     default:
       throw new Error('Invalid type: ' + type);
@@ -33000,7 +33176,7 @@ var ExtentEvent = /** @class */function (_super) {
 function getDefaultExtentStyleFunction() {
   var style = createEditingStyle();
   return function (feature, resolution) {
-    return style[GeometryType.POLYGON];
+    return style['Polygon'];
   };
 }
 /**
@@ -33011,7 +33187,7 @@ function getDefaultExtentStyleFunction() {
 function getDefaultPointerStyleFunction() {
   var style = createEditingStyle();
   return function (feature, resolution) {
-    return style[GeometryType.POINT];
+    return style['Point'];
   };
 }
 /**
@@ -33799,38 +33975,38 @@ var ModifyEvent = /** @class */function (_super) {
         vertex.push(segment[index][vertex.length]);
       }
       switch (geometry.getType()) {
-        case GeometryType.POINT:
+        case 'Point':
           coordinates = vertex;
           segment[0] = vertex;
           segment[1] = vertex;
           break;
-        case GeometryType.MULTI_POINT:
+        case 'MultiPoint':
           coordinates = geometry.getCoordinates();
           coordinates[segmentData.index] = vertex;
           segment[0] = vertex;
           segment[1] = vertex;
           break;
-        case GeometryType.LINE_STRING:
+        case 'LineString':
           coordinates = geometry.getCoordinates();
           coordinates[segmentData.index + index] = vertex;
           segment[index] = vertex;
           break;
-        case GeometryType.MULTI_LINE_STRING:
+        case 'MultiLineString':
           coordinates = geometry.getCoordinates();
           coordinates[depth[0]][segmentData.index + index] = vertex;
           segment[index] = vertex;
           break;
-        case GeometryType.POLYGON:
+        case 'Polygon':
           coordinates = geometry.getCoordinates();
           coordinates[depth[0]][segmentData.index + index] = vertex;
           segment[index] = vertex;
           break;
-        case GeometryType.MULTI_POLYGON:
+        case 'MultiPolygon':
           coordinates = geometry.getCoordinates();
           coordinates[depth[1]][depth[0]][segmentData.index + index] = vertex;
           segment[index] = vertex;
           break;
-        case GeometryType.CIRCLE:
+        case 'Circle':
           segment[0] = vertex;
           segment[1] = vertex;
           if (segmentData.index === CIRCLE_CENTER_INDEX) {
@@ -33895,7 +34071,7 @@ var ModifyEvent = /** @class */function (_super) {
         if (!componentSegments[uid]) {
           componentSegments[uid] = new Array(2);
         }
-        if (segmentDataMatch.geometry.getType() === GeometryType.CIRCLE && segmentDataMatch.index === CIRCLE_CIRCUMFERENCE_INDEX) {
+        if (segmentDataMatch.geometry.getType() === 'Circle' && segmentDataMatch.index === CIRCLE_CIRCUMFERENCE_INDEX) {
           var closestVertex = closestOnSegmentData(pixelCoordinate, segmentDataMatch, projection);
           if (equals(closestVertex, vertex) && !componentSegments[uid][0]) {
             this.dragSegments_.push([segmentDataMatch, 0]);
@@ -33909,10 +34085,27 @@ var ModifyEvent = /** @class */function (_super) {
           continue;
         }
         if (equals(segment[1], vertex) && !componentSegments[uid][1]) {
-          // prevent dragging closed linestrings by the connecting node
-          if ((segmentDataMatch.geometry.getType() === GeometryType.LINE_STRING || segmentDataMatch.geometry.getType() === GeometryType.MULTI_LINE_STRING) && componentSegments[uid][0] && componentSegments[uid][0].index === 0) {
-            continue;
+          if (componentSegments[uid][0] && componentSegments[uid][0].index === 0) {
+            var coordinates = segmentDataMatch.geometry.getCoordinates();
+            switch (segmentDataMatch.geometry.getType()) {
+              // prevent dragging closed linestrings by the connecting node
+              case 'LineString':
+              case 'MultiLineString':
+                continue;
+              // if dragging the first vertex of a polygon, ensure the other segment
+              // belongs to the closing vertex of the linear ring
+              case 'MultiPolygon':
+                coordinates = coordinates[depth[1]];
+              /* falls through */
+              case 'Polygon':
+                if (segmentDataMatch.index !== coordinates[depth[0]].length - 2) {
+                  continue;
+                }
+                break;
+              // pass
+            }
           }
+
           this.dragSegments_.push([segmentDataMatch, 1]);
           componentSegments[uid][1] = segmentDataMatch;
           continue;
@@ -33939,7 +34132,7 @@ var ModifyEvent = /** @class */function (_super) {
     for (var i = this.dragSegments_.length - 1; i >= 0; --i) {
       var segmentData = this.dragSegments_[i][0];
       var geometry = segmentData.geometry;
-      if (geometry.getType() === GeometryType.CIRCLE) {
+      if (geometry.getType() === 'Circle') {
         // Update a circle object in the R* bush:
         var coordinates = geometry.getCenter();
         var centerSegmentData = segmentData.featureSegments[0];
@@ -33997,7 +34190,7 @@ var ModifyEvent = /** @class */function (_super) {
       } : undefined;
       map.forEachFeatureAtPixel(pixel, function (feature, layer, geometry) {
         geometry = geometry || /** @type {import("../geom/SimpleGeometry").default} */feature.getGeometry();
-        if (geometry.getType() === GeometryType.POINT && includes(_this.features_.getArray(), feature)) {
+        if (geometry.getType() === 'Point' && includes(_this.features_.getArray(), feature)) {
           hitPointGeometry = geometry;
           var coordinate = geometry.getFlatCoordinates().slice(0, 2);
           nodes = [{
@@ -34031,7 +34224,7 @@ var ModifyEvent = /** @class */function (_super) {
           this.delta_[0] = vertex[0] - pixelCoordinate[0];
           this.delta_[1] = vertex[1] - pixelCoordinate[1];
         }
-        if (node.geometry.getType() === GeometryType.CIRCLE && node.index === CIRCLE_CIRCUMFERENCE_INDEX) {
+        if (node.geometry.getType() === 'Circle' && node.index === CIRCLE_CIRCUMFERENCE_INDEX) {
           this.snappedToVertex_ = true;
           this.createOrUpdateVertexFeature_(vertex, [node.feature], [node.geometry]);
         } else {
@@ -34085,19 +34278,19 @@ var ModifyEvent = /** @class */function (_super) {
       vertex.push(0);
     }
     switch (geometry.getType()) {
-      case GeometryType.MULTI_LINE_STRING:
+      case 'MultiLineString':
         coordinates = geometry.getCoordinates();
         coordinates[depth[0]].splice(index + 1, 0, vertex);
         break;
-      case GeometryType.POLYGON:
+      case 'Polygon':
         coordinates = geometry.getCoordinates();
         coordinates[depth[0]].splice(index + 1, 0, vertex);
         break;
-      case GeometryType.MULTI_POLYGON:
+      case 'MultiPolygon':
         coordinates = geometry.getCoordinates();
         coordinates[depth[1]][depth[0]].splice(index + 1, 0, vertex);
         break;
-      case GeometryType.LINE_STRING:
+      case 'LineString':
         coordinates = geometry.getCoordinates();
         coordinates.splice(index + 1, 0, vertex);
         break;
@@ -34196,22 +34389,22 @@ var ModifyEvent = /** @class */function (_super) {
       component = coordinates;
       deleted = false;
       switch (geometry.getType()) {
-        case GeometryType.MULTI_LINE_STRING:
+        case 'MultiLineString':
           if (coordinates[segmentData.depth[0]].length > 2) {
             coordinates[segmentData.depth[0]].splice(index, 1);
             deleted = true;
           }
           break;
-        case GeometryType.LINE_STRING:
+        case 'LineString':
           if (coordinates.length > 2) {
             coordinates.splice(index, 1);
             deleted = true;
           }
           break;
-        case GeometryType.MULTI_POLYGON:
+        case 'MultiPolygon':
           component = component[segmentData.depth[1]];
         /* falls through */
-        case GeometryType.POLYGON:
+        case 'Polygon':
           component = component[segmentData.depth[0]];
           if (component.length > 4) {
             if (index == component.length - 1) {
@@ -34308,7 +34501,7 @@ function compareIndexes(a, b) {
  */
 function projectedDistanceToSegmentDataSquared(pointCoordinates, segmentData, projection) {
   var geometry = segmentData.geometry;
-  if (geometry.getType() === GeometryType.CIRCLE) {
+  if (geometry.getType() === 'Circle') {
     var circleGeometry = /** @type {import("../geom/Circle.js").default} */geometry;
     if (segmentData.index === CIRCLE_CIRCUMFERENCE_INDEX) {
       var userProjection = getUserProjection();
@@ -34337,7 +34530,7 @@ function projectedDistanceToSegmentDataSquared(pointCoordinates, segmentData, pr
  */
 function closestOnSegmentData(pointCoordinates, segmentData, projection) {
   var geometry = segmentData.geometry;
-  if (geometry.getType() === GeometryType.CIRCLE && segmentData.index === CIRCLE_CIRCUMFERENCE_INDEX) {
+  if (geometry.getType() === 'Circle' && segmentData.index === CIRCLE_CIRCUMFERENCE_INDEX) {
     var circleGeometry = /** @type {import("../geom/Circle.js").default} */geometry;
     var userProjection = getUserProjection();
     if (userProjection) {
@@ -34356,7 +34549,7 @@ function closestOnSegmentData(pointCoordinates, segmentData, projection) {
 function getDefaultStyleFunction$1() {
   var style = createEditingStyle();
   return function (feature, resolution) {
-    return style[GeometryType.POINT];
+    return style['Point'];
   };
 }
 
@@ -34851,8 +35044,8 @@ var originalFeatureStyles = {};
  */
 function getDefaultStyleFunction() {
   var styles = createEditingStyle();
-  extend$2(styles[GeometryType.POLYGON], styles[GeometryType.LINE_STRING]);
-  extend$2(styles[GeometryType.GEOMETRY_COLLECTION], styles[GeometryType.LINE_STRING]);
+  extend$2(styles['Polygon'], styles['LineString']);
+  extend$2(styles['GeometryCollection'], styles['LineString']);
   return function (feature) {
     if (!feature.getGeometry()) {
       return null;
@@ -34883,7 +35076,6 @@ var __extends$e = undefined && undefined.__extends || function () {
 }();
 /**
  * @typedef {Object} Result
- * @property {boolean} snapped Snapped.
  * @property {import("../coordinate.js").Coordinate|null} vertex Vertex.
  * @property {import("../pixel.js").Pixel|null} vertexPixel VertexPixel.
  */
@@ -35014,18 +35206,18 @@ var tempSegment = [];
     /**
      * @const
      * @private
-     * @type {Object<string, function(import("../Feature.js").default, import("../geom/Geometry.js").default): void>}
+     * @type {Object<string, function(Array<Array<import('../coordinate.js').Coordinate>>, import("../geom/Geometry.js").default): void>}
      */
-    _this.SEGMENT_WRITERS_ = {
-      'Point': _this.writePointGeometry_.bind(_this),
-      'LineString': _this.writeLineStringGeometry_.bind(_this),
-      'LinearRing': _this.writeLineStringGeometry_.bind(_this),
-      'Polygon': _this.writePolygonGeometry_.bind(_this),
-      'MultiPoint': _this.writeMultiPointGeometry_.bind(_this),
-      'MultiLineString': _this.writeMultiLineStringGeometry_.bind(_this),
-      'MultiPolygon': _this.writeMultiPolygonGeometry_.bind(_this),
-      'GeometryCollection': _this.writeGeometryCollectionGeometry_.bind(_this),
-      'Circle': _this.writeCircleGeometry_.bind(_this)
+    _this.GEOMETRY_SEGMENTERS_ = {
+      'Point': _this.segmentPointGeometry_.bind(_this),
+      'LineString': _this.segmentLineStringGeometry_.bind(_this),
+      'LinearRing': _this.segmentLineStringGeometry_.bind(_this),
+      'Polygon': _this.segmentPolygonGeometry_.bind(_this),
+      'MultiPoint': _this.segmentMultiPointGeometry_.bind(_this),
+      'MultiLineString': _this.segmentMultiLineStringGeometry_.bind(_this),
+      'MultiPolygon': _this.segmentMultiPolygonGeometry_.bind(_this),
+      'GeometryCollection': _this.segmentGeometryCollectionGeometry_.bind(_this),
+      'Circle': _this.segmentCircleGeometry_.bind(_this)
     };
     return _this;
   }
@@ -35041,10 +35233,28 @@ var tempSegment = [];
     var feature_uid = getUid(feature);
     var geometry = feature.getGeometry();
     if (geometry) {
-      var segmentWriter = this.SEGMENT_WRITERS_[geometry.getType()];
-      if (segmentWriter) {
+      var segmenter = this.GEOMETRY_SEGMENTERS_[geometry.getType()];
+      if (segmenter) {
         this.indexedFeaturesExtents_[feature_uid] = geometry.getExtent(createEmpty());
-        segmentWriter(feature, geometry);
+        var segments = /** @type {Array<Array<import('../coordinate.js').Coordinate>>} */[];
+        segmenter(segments, geometry);
+        if (segments.length === 1) {
+          this.rBush_.insert(boundingExtent(segments[0]), {
+            feature: feature,
+            segment: segments[0]
+          });
+        } else if (segments.length > 1) {
+          var extents = segments.map(function (s) {
+            return boundingExtent(s);
+          });
+          var segmentsData = segments.map(function (segment) {
+            return {
+              feature: feature,
+              segment: segment
+            };
+          });
+          this.rBush_.load(extents, segmentsData);
+        }
       }
     }
     if (register) {
@@ -35084,7 +35294,7 @@ var tempSegment = [];
    */
   Snap.prototype.handleEvent = function (evt) {
     var result = this.snapTo(evt.pixel, evt.coordinate, evt.map);
-    if (result.snapped) {
+    if (result) {
       evt.coordinate = result.vertex.slice(0, 2);
       evt.pixel = result.vertexPixel;
     }
@@ -35191,93 +35401,90 @@ var tempSegment = [];
    * @param {import("../pixel.js").Pixel} pixel Pixel
    * @param {import("../coordinate.js").Coordinate} pixelCoordinate Coordinate
    * @param {import("../PluggableMap.js").default} map Map.
-   * @return {Result} Snap result
+   * @return {Result|null} Snap result
    */
   Snap.prototype.snapTo = function (pixel, pixelCoordinate, map) {
     var lowerLeft = map.getCoordinateFromPixel([pixel[0] - this.pixelTolerance_, pixel[1] + this.pixelTolerance_]);
     var upperRight = map.getCoordinateFromPixel([pixel[0] + this.pixelTolerance_, pixel[1] - this.pixelTolerance_]);
     var box = boundingExtent([lowerLeft, upperRight]);
     var segments = this.rBush_.getInExtent(box);
-    // If snapping on vertices only, don't consider circles
-    if (this.vertex_ && !this.edge_) {
-      segments = segments.filter(function (segment) {
-        return segment.feature.getGeometry().getType() !== GeometryType.CIRCLE;
-      });
-    }
-    var snapped = false;
-    var vertex = null;
-    var vertexPixel = null;
-    if (segments.length === 0) {
-      return {
-        snapped: snapped,
-        vertex: vertex,
-        vertexPixel: vertexPixel
-      };
+    var segmentsLength = segments.length;
+    if (segmentsLength === 0) {
+      return null;
     }
     var projection = map.getView().getProjection();
     var projectedCoordinate = fromUserCoordinate(pixelCoordinate);
-    var closestSegmentData;
+    var closestVertex;
     var minSquaredDistance = Infinity;
-    for (var i = 0; i < segments.length; ++i) {
-      var segmentData = segments[i];
-      tempSegment[0] = fromUserCoordinate(segmentData.segment[0]);
-      tempSegment[1] = fromUserCoordinate(segmentData.segment[1]);
-      var delta = squaredDistanceToSegment(projectedCoordinate, tempSegment);
-      if (delta < minSquaredDistance) {
-        closestSegmentData = segmentData;
-        minSquaredDistance = delta;
+    var squaredPixelTolerance = this.pixelTolerance_ * this.pixelTolerance_;
+    var getResult = function () {
+      if (closestVertex) {
+        var vertexPixel = map.getPixelFromCoordinate(closestVertex);
+        var squaredPixelDistance = squaredDistance(pixel, vertexPixel);
+        if (squaredPixelDistance <= squaredPixelTolerance) {
+          return {
+            vertex: closestVertex,
+            vertexPixel: [Math.round(vertexPixel[0]), Math.round(vertexPixel[1])]
+          };
+        }
+      }
+      return null;
+    };
+    if (this.vertex_) {
+      for (var i = 0; i < segmentsLength; ++i) {
+        var segmentData = segments[i];
+        if (segmentData.feature.getGeometry().getType() !== 'Circle') {
+          segmentData.segment.forEach(function (vertex) {
+            var tempVertexCoord = fromUserCoordinate(vertex);
+            var delta = squaredDistance(projectedCoordinate, tempVertexCoord);
+            if (delta < minSquaredDistance) {
+              closestVertex = vertex;
+              minSquaredDistance = delta;
+            }
+          });
+        }
+      }
+      var result = getResult();
+      if (result) {
+        return result;
       }
     }
-    var closestSegment = closestSegmentData.segment;
-    if (this.vertex_ && !this.edge_) {
-      var pixel1 = map.getPixelFromCoordinate(closestSegment[0]);
-      var pixel2 = map.getPixelFromCoordinate(closestSegment[1]);
-      var squaredDist1 = squaredDistance(pixel, pixel1);
-      var squaredDist2 = squaredDistance(pixel, pixel2);
-      var dist = Math.sqrt(Math.min(squaredDist1, squaredDist2));
-      if (dist <= this.pixelTolerance_) {
-        snapped = true;
-        vertex = squaredDist1 > squaredDist2 ? closestSegment[1] : closestSegment[0];
-        vertexPixel = map.getPixelFromCoordinate(vertex);
-      }
-    } else if (this.edge_) {
-      var isCircle = closestSegmentData.feature.getGeometry().getType() === GeometryType.CIRCLE;
-      if (isCircle) {
-        var circleGeometry = closestSegmentData.feature.getGeometry();
-        var userProjection = getUserProjection();
-        if (userProjection) {
-          circleGeometry = circleGeometry.clone().transform(userProjection, projection);
+    if (this.edge_) {
+      for (var i = 0; i < segmentsLength; ++i) {
+        var vertex = null;
+        var segmentData = segments[i];
+        if (segmentData.feature.getGeometry().getType() === 'Circle') {
+          var circleGeometry = segmentData.feature.getGeometry();
+          var userProjection = getUserProjection();
+          if (userProjection) {
+            circleGeometry = circleGeometry.clone().transform(userProjection, projection);
+          }
+          vertex = toUserCoordinate(closestOnCircle(projectedCoordinate, /** @type {import("../geom/Circle.js").default} */circleGeometry));
+        } else {
+          var _a = segmentData.segment,
+            segmentStart = _a[0],
+            segmentEnd = _a[1];
+          // points have only one coordinate
+          if (segmentEnd) {
+            tempSegment[0] = fromUserCoordinate(segmentStart);
+            tempSegment[1] = fromUserCoordinate(segmentEnd);
+            vertex = closestOnSegment(projectedCoordinate, tempSegment);
+          }
         }
-        vertex = toUserCoordinate(closestOnCircle(projectedCoordinate, /** @type {import("../geom/Circle.js").default} */circleGeometry));
-      } else {
-        tempSegment[0] = fromUserCoordinate(closestSegment[0]);
-        tempSegment[1] = fromUserCoordinate(closestSegment[1]);
-        vertex = toUserCoordinate(closestOnSegment(projectedCoordinate, tempSegment));
-      }
-      vertexPixel = map.getPixelFromCoordinate(vertex);
-      if (distance(pixel, vertexPixel) <= this.pixelTolerance_) {
-        snapped = true;
-        if (this.vertex_ && !isCircle) {
-          var pixel1 = map.getPixelFromCoordinate(closestSegment[0]);
-          var pixel2 = map.getPixelFromCoordinate(closestSegment[1]);
-          var squaredDist1 = squaredDistance(vertexPixel, pixel1);
-          var squaredDist2 = squaredDistance(vertexPixel, pixel2);
-          var dist = Math.sqrt(Math.min(squaredDist1, squaredDist2));
-          if (dist <= this.pixelTolerance_) {
-            vertex = squaredDist1 > squaredDist2 ? closestSegment[1] : closestSegment[0];
-            vertexPixel = map.getPixelFromCoordinate(vertex);
+        if (vertex) {
+          var delta = squaredDistance(projectedCoordinate, vertex);
+          if (delta < minSquaredDistance) {
+            closestVertex = vertex;
+            minSquaredDistance = delta;
           }
         }
       }
+      var result = getResult();
+      if (result) {
+        return result;
+      }
     }
-    if (snapped) {
-      vertexPixel = [Math.round(vertexPixel[0]), Math.round(vertexPixel[1])];
-    }
-    return {
-      snapped: snapped,
-      vertex: vertex,
-      vertexPixel: vertexPixel
-    };
+    return null;
   };
   /**
    * @param {import("../Feature.js").default} feature Feature
@@ -35288,140 +35495,104 @@ var tempSegment = [];
     this.addFeature(feature, false);
   };
   /**
-   * @param {import("../Feature.js").default} feature Feature
+   * @param {Array<Array<import('../coordinate.js').Coordinate>>} segments Segments
    * @param {import("../geom/Circle.js").default} geometry Geometry.
    * @private
    */
-  Snap.prototype.writeCircleGeometry_ = function (feature, geometry) {
+  Snap.prototype.segmentCircleGeometry_ = function (segments, geometry) {
     this.getMap().getView().getProjection();
     var circleGeometry = geometry;
     var polygon = fromCircle(circleGeometry);
     var coordinates = polygon.getCoordinates()[0];
     for (var i = 0, ii = coordinates.length - 1; i < ii; ++i) {
-      var segment = coordinates.slice(i, i + 2);
-      var segmentData = {
-        feature: feature,
-        segment: segment
-      };
-      this.rBush_.insert(boundingExtent(segment), segmentData);
+      segments.push(coordinates.slice(i, i + 2));
     }
   };
   /**
-   * @param {import("../Feature.js").default} feature Feature
+   * @param {Array<Array<import('../coordinate.js').Coordinate>>} segments Segments
    * @param {import("../geom/GeometryCollection.js").default} geometry Geometry.
    * @private
    */
-  Snap.prototype.writeGeometryCollectionGeometry_ = function (feature, geometry) {
+  Snap.prototype.segmentGeometryCollectionGeometry_ = function (segments, geometry) {
     var geometries = geometry.getGeometriesArray();
     for (var i = 0; i < geometries.length; ++i) {
-      var segmentWriter = this.SEGMENT_WRITERS_[geometries[i].getType()];
-      if (segmentWriter) {
-        segmentWriter(feature, geometries[i]);
+      var segmenter = this.GEOMETRY_SEGMENTERS_[geometries[i].getType()];
+      if (segmenter) {
+        segmenter(segments, geometries[i]);
       }
     }
   };
   /**
-   * @param {import("../Feature.js").default} feature Feature
+   * @param {Array<Array<import('../coordinate.js').Coordinate>>} segments Segments
    * @param {import("../geom/LineString.js").default} geometry Geometry.
    * @private
    */
-  Snap.prototype.writeLineStringGeometry_ = function (feature, geometry) {
+  Snap.prototype.segmentLineStringGeometry_ = function (segments, geometry) {
     var coordinates = geometry.getCoordinates();
     for (var i = 0, ii = coordinates.length - 1; i < ii; ++i) {
-      var segment = coordinates.slice(i, i + 2);
-      var segmentData = {
-        feature: feature,
-        segment: segment
-      };
-      this.rBush_.insert(boundingExtent(segment), segmentData);
+      segments.push(coordinates.slice(i, i + 2));
     }
   };
   /**
-   * @param {import("../Feature.js").default} feature Feature
+   * @param {Array<Array<import('../coordinate.js').Coordinate>>} segments Segments
    * @param {import("../geom/MultiLineString.js").default} geometry Geometry.
    * @private
    */
-  Snap.prototype.writeMultiLineStringGeometry_ = function (feature, geometry) {
+  Snap.prototype.segmentMultiLineStringGeometry_ = function (segments, geometry) {
     var lines = geometry.getCoordinates();
     for (var j = 0, jj = lines.length; j < jj; ++j) {
       var coordinates = lines[j];
       for (var i = 0, ii = coordinates.length - 1; i < ii; ++i) {
-        var segment = coordinates.slice(i, i + 2);
-        var segmentData = {
-          feature: feature,
-          segment: segment
-        };
-        this.rBush_.insert(boundingExtent(segment), segmentData);
+        segments.push(coordinates.slice(i, i + 2));
       }
     }
   };
   /**
-   * @param {import("../Feature.js").default} feature Feature
+   * @param {Array<Array<import('../coordinate.js').Coordinate>>} segments Segments
    * @param {import("../geom/MultiPoint.js").default} geometry Geometry.
    * @private
    */
-  Snap.prototype.writeMultiPointGeometry_ = function (feature, geometry) {
-    var points = geometry.getCoordinates();
-    for (var i = 0, ii = points.length; i < ii; ++i) {
-      var coordinates = points[i];
-      var segmentData = {
-        feature: feature,
-        segment: [coordinates, coordinates]
-      };
-      this.rBush_.insert(geometry.getExtent(), segmentData);
-    }
+  Snap.prototype.segmentMultiPointGeometry_ = function (segments, geometry) {
+    geometry.getCoordinates().forEach(function (point) {
+      segments.push([point]);
+    });
   };
   /**
-   * @param {import("../Feature.js").default} feature Feature
+   * @param {Array<Array<import('../coordinate.js').Coordinate>>} segments Segments
    * @param {import("../geom/MultiPolygon.js").default} geometry Geometry.
    * @private
    */
-  Snap.prototype.writeMultiPolygonGeometry_ = function (feature, geometry) {
+  Snap.prototype.segmentMultiPolygonGeometry_ = function (segments, geometry) {
     var polygons = geometry.getCoordinates();
     for (var k = 0, kk = polygons.length; k < kk; ++k) {
       var rings = polygons[k];
       for (var j = 0, jj = rings.length; j < jj; ++j) {
         var coordinates = rings[j];
         for (var i = 0, ii = coordinates.length - 1; i < ii; ++i) {
-          var segment = coordinates.slice(i, i + 2);
-          var segmentData = {
-            feature: feature,
-            segment: segment
-          };
-          this.rBush_.insert(boundingExtent(segment), segmentData);
+          segments.push(coordinates.slice(i, i + 2));
         }
       }
     }
   };
   /**
-   * @param {import("../Feature.js").default} feature Feature
+   * @param {Array<Array<import('../coordinate.js').Coordinate>>} segments Segments
    * @param {import("../geom/Point.js").default} geometry Geometry.
    * @private
    */
-  Snap.prototype.writePointGeometry_ = function (feature, geometry) {
-    var coordinates = geometry.getCoordinates();
-    var segmentData = {
-      feature: feature,
-      segment: [coordinates, coordinates]
-    };
-    this.rBush_.insert(geometry.getExtent(), segmentData);
+  Snap.prototype.segmentPointGeometry_ = function (segments, geometry) {
+    segments.push([geometry.getCoordinates()]);
   };
   /**
-   * @param {import("../Feature.js").default} feature Feature
+   * @param {Array<Array<import('../coordinate.js').Coordinate>>} segments Segments
    * @param {import("../geom/Polygon.js").default} geometry Geometry.
    * @private
    */
-  Snap.prototype.writePolygonGeometry_ = function (feature, geometry) {
+  Snap.prototype.segmentPolygonGeometry_ = function (segments, geometry) {
     var rings = geometry.getCoordinates();
     for (var j = 0, jj = rings.length; j < jj; ++j) {
       var coordinates = rings[j];
       for (var i = 0, ii = coordinates.length - 1; i < ii; ++i) {
-        var segment = coordinates.slice(i, i + 2);
-        var segmentData = {
-          feature: feature,
-          segment: segment
-        };
-        this.rBush_.insert(boundingExtent(segment), segmentData);
+        segments.push(coordinates.slice(i, i + 2));
       }
     }
   };
@@ -36952,6 +37123,10 @@ var IMAGE_SMOOTHING_ENABLED = {
  */
 var brokenDiagonalRendering_;
 /**
+ * @type {Array<HTMLCanvasElement>}
+ */
+var canvasPool = [];
+/**
  * This draws a small triangle into a canvas by setting the triangle as the clip region
  * and then drawing a (too large) rectangle
  *
@@ -37084,11 +37259,11 @@ function calculateSourceExtentResolution(sourceProj, targetProj, targetExtent, t
  * @param {Array<ImageExtent>} sources Array of sources.
  * @param {number} gutter Gutter of the sources.
  * @param {boolean} [opt_renderEdges] Render reprojection edges.
- * @param {object} [opt_interpolate] Use linear interpolation when resampling.
+ * @param {boolean} [opt_interpolate] Use linear interpolation when resampling.
  * @return {HTMLCanvasElement} Canvas with reprojected data.
  */
 function render(width, height, pixelRatio, sourceResolution, sourceExtent, targetResolution, targetExtent, triangulation, sources, gutter, opt_renderEdges, opt_interpolate) {
-  var context = createCanvasContext2D(Math.round(pixelRatio * width), Math.round(pixelRatio * height));
+  var context = createCanvasContext2D(Math.round(pixelRatio * width), Math.round(pixelRatio * height), canvasPool);
   if (!opt_interpolate) {
     assign(context, IMAGE_SMOOTHING_DISABLED);
   }
@@ -37477,6 +37652,17 @@ var ReprojTile = /** @class */function (_super) {
     this.sourcesListenerKeys_.forEach(unlistenByKey);
     this.sourcesListenerKeys_ = null;
   };
+  /**
+   * Remove from the cache due to expiry
+   */
+  ReprojTile.prototype.release = function () {
+    if (this.canvas_) {
+      releaseCanvas(this.canvas_.getContext('2d'));
+      canvasPool.push(this.canvas_);
+      this.canvas_ = null;
+    }
+    _super.prototype.release.call(this);
+  };
   return ReprojTile;
 }(Tile);
 
@@ -37761,7 +37947,8 @@ var CanvasTileLayerRenderer = /** @class */function (_super) {
       var tileResolution = tileGrid.getResolution(z);
       var col = Math.floor(tilePixelRatio * ((coordinate[0] - tileOrigin[0]) / tileResolution - tileCoord[1] * tileSize[0]));
       var row = Math.floor(tilePixelRatio * ((tileOrigin[1] - coordinate[1]) / tileResolution - tileCoord[2] * tileSize[1]));
-      return this.getImageData(tile.getImage(), col, row);
+      var gutter = Math.round(tilePixelRatio * source.getGutterForProjection(viewState.projection));
+      return this.getImageData(tile.getImage(), col + gutter, row + gutter);
     }
     return null;
   };
@@ -37806,18 +37993,14 @@ var CanvasTileLayerRenderer = /** @class */function (_super) {
     var z = tileGrid.getZForResolution(viewResolution, tileSource.zDirection);
     var tileResolution = tileGrid.getResolution(z);
     var extent = frameState.extent;
+    var resolution = frameState.viewState.resolution;
+    var tilePixelRatio = tileSource.getTilePixelRatio(pixelRatio);
+    // desired dimensions of the canvas in pixels
+    var width = Math.round(getWidth(extent) / resolution * pixelRatio);
+    var height = Math.round(getHeight(extent) / resolution * pixelRatio);
     var layerExtent = layerState.extent && fromUserExtent(layerState.extent);
     if (layerExtent) {
       extent = getIntersection(extent, fromUserExtent(layerState.extent));
-    }
-    var tilePixelRatio = tileSource.getTilePixelRatio(pixelRatio);
-    // desired dimensions of the canvas in pixels
-    var width = Math.round(frameState.size[0] * tilePixelRatio);
-    var height = Math.round(frameState.size[1] * tilePixelRatio);
-    if (rotation) {
-      var size = Math.round(Math.sqrt(width * width + height * height));
-      width = size;
-      height = size;
     }
     var dx = tileResolution * width / 2 / tilePixelRatio;
     var dy = tileResolution * height / 2 / tilePixelRatio;
@@ -37832,14 +38015,23 @@ var CanvasTileLayerRenderer = /** @class */function (_super) {
     var tmpExtent = this.tmpExtent;
     var tmpTileRange = this.tmpTileRange_;
     this.newTiles_ = false;
+    var viewport = rotation ? getRotatedViewport(viewState.center, resolution, rotation, frameState.size) : undefined;
     for (var x = tileRange.minX; x <= tileRange.maxX; ++x) {
       for (var y = tileRange.minY; y <= tileRange.maxY; ++y) {
+        if (rotation && !tileGrid.tileCoordIntersectsViewport([z, x, y], viewport)) {
+          continue;
+        }
         var tile = this.getTile(z, x, y, frameState);
         if (this.isDrawableTile(tile)) {
           var uid = getUid(this);
           if (tile.getState() == TileState.LOADED) {
             tilesToDrawByZ[z][tile.tileCoord.toString()] = tile;
             var inTransition = tile.inTransition(uid);
+            if (inTransition && layerState.opacity !== 1) {
+              // Skipping transition when layer is not fully opaque avoids visual artifacts.
+              tile.endTransition(uid);
+              inTransition = false;
+            }
             if (!this.newTiles_ && (inTransition || this.renderedTiles.indexOf(tile) === -1)) {
               this.newTiles_ = true;
             }
@@ -37859,11 +38051,11 @@ var CanvasTileLayerRenderer = /** @class */function (_super) {
         }
       }
     }
-    var canvasScale = tileResolution / viewResolution;
+    var canvasScale = tileResolution / viewResolution * pixelRatio / tilePixelRatio;
     // set forward and inverse pixel transforms
-    compose(this.pixelTransform, frameState.size[0] / 2, frameState.size[1] / 2, 1 / tilePixelRatio, 1 / tilePixelRatio, rotation, -width / 2, -height / 2);
+    compose(this.pixelTransform, frameState.size[0] / 2, frameState.size[1] / 2, 1 / pixelRatio, 1 / pixelRatio, rotation, -width / 2, -height / 2);
     var canvasTransform = toString$1(this.pixelTransform);
-    this.useContainer(target, canvasTransform, layerState.opacity, this.getBackground(frameState));
+    this.useContainer(target, canvasTransform, this.getBackground(frameState));
     var context = this.context;
     var canvas = context.canvas;
     makeInverse(this.inversePixelTransform, this.pixelTransform);
@@ -37981,11 +38173,6 @@ var CanvasTileLayerRenderer = /** @class */function (_super) {
     if (canvasTransform !== canvas.style.transform) {
       canvas.style.transform = canvasTransform;
     }
-    var opacity = cssOpacity(layerState.opacity);
-    var container = this.container;
-    if (opacity !== container.style.opacity) {
-      container.style.opacity = opacity;
-    }
     return this.container;
   };
   /**
@@ -38004,7 +38191,8 @@ var CanvasTileLayerRenderer = /** @class */function (_super) {
       return;
     }
     var uid = getUid(this);
-    var alpha = transition ? tile.getAlpha(uid, frameState.time) : 1;
+    var layerState = frameState.layerStatesArray[frameState.layerIndex];
+    var alpha = layerState.opacity * (transition ? tile.getAlpha(uid, frameState.time) : 1);
     var alphaChanged = alpha !== this.context.globalAlpha;
     if (alphaChanged) {
       this.context.save();
@@ -38014,7 +38202,7 @@ var CanvasTileLayerRenderer = /** @class */function (_super) {
     if (alphaChanged) {
       this.context.restore();
     }
-    if (alpha !== 1) {
+    if (alpha !== layerState.opacity) {
       frameState.animate = true;
     } else if (transition) {
       tile.endTransition(uid);
@@ -38097,6 +38285,8 @@ var CanvasTileLayerRenderer = /** @class */function (_super) {
     var wantedTiles = frameState.wantedTiles[tileSourceKey];
     var tileQueue = frameState.tileQueue;
     var minZoom = tileGrid.getMinZoom();
+    var rotation = frameState.viewState.rotation;
+    var viewport = rotation ? getRotatedViewport(frameState.viewState.center, frameState.viewState.resolution, rotation, frameState.size) : undefined;
     var tileCount = 0;
     var tile, tileRange, tileResolution, x, y, z;
     for (z = minZoom; z <= currentZ; ++z) {
@@ -38104,6 +38294,9 @@ var CanvasTileLayerRenderer = /** @class */function (_super) {
       tileResolution = tileGrid.getResolution(z);
       for (x = tileRange.minX; x <= tileRange.maxX; ++x) {
         for (y = tileRange.minY; y <= tileRange.maxY; ++y) {
+          if (rotation && !tileGrid.tileCoordIntersectsViewport([z, x, y], viewport)) {
+            continue;
+          }
           if (currentZ - z <= preload) {
             ++tileCount;
             tile = tileSource.getTile(z, x, y, pixelRatio, projection);
@@ -38367,6 +38560,17 @@ var LRUCache = /** @class */function () {
     return this.newest_.key_;
   };
   /**
+   * Return an entry without updating least recently used time.
+   * @param {string} key Key.
+   * @return {T} Value.
+   */
+  LRUCache.prototype.peek = function (key) {
+    if (!this.containsKey(key)) {
+      return undefined;
+    }
+    return this.entries_[key].value_;
+  };
+  /**
    * @return {T} value Value.
    */
   LRUCache.prototype.pop = function () {
@@ -38628,7 +38832,7 @@ var DECIMALS = 5;
  * negative because OpenLayers tile coordinates use the top left as the origin.
  * @property {number|import("../size.js").Size} [tileSize] Tile size.
  * Default is `[256, 256]`.
- * @property {Array<import("../size.js").Size>} [tileSizes] Tile sizes. If given, the array length
+ * @property {Array<number|import("../size.js").Size>} [tileSizes] Tile sizes. If given, the array length
  * should match the length of the `resolutions` array, i.e. each resolution can have a different
  * tile size.
  */
@@ -38857,7 +39061,7 @@ var TileGrid = /** @class */function () {
    * @param {import("../tilecoord.js").TileCoord} tileCoord Tile coordinate.
    * @param {import("../TileRange.js").default} [opt_tileRange] Temporary import("../TileRange.js").default object.
    * @param {import("../extent.js").Extent} [opt_extent] Temporary import("../extent.js").Extent object.
-   * @return {import("../TileRange.js").default} Tile range.
+   * @return {import("../TileRange.js").default|null} Tile range.
    */
   TileGrid.prototype.getTileCoordChildTileRange = function (tileCoord, opt_tileRange, opt_extent) {
     if (tileCoord[0] < this.maxZoom) {
@@ -38875,7 +39079,7 @@ var TileGrid = /** @class */function () {
    * @param {import("../tilecoord.js").TileCoord} tileCoord Tile coordinate.
    * @param {number} z Integer zoom level.
    * @param {import("../TileRange.js").default} [opt_tileRange] Temporary import("../TileRange.js").default object.
-   * @return {import("../TileRange.js").default} Tile range.
+   * @return {import("../TileRange.js").default|null} Tile range.
    */
   TileGrid.prototype.getTileRangeForTileCoordAndZ = function (tileCoord, z, opt_tileRange) {
     if (z > this.maxZoom || z < this.minZoom) {
@@ -39100,6 +39304,15 @@ var TileGrid = /** @class */function () {
     return clamp(z, this.minZoom, this.maxZoom);
   };
   /**
+   * The tile with the provided tile coordinate intersects the given viewport.
+   * @param {import('../tilecoord.js').TileCoord} tileCoord Tile coordinate.
+   * @param {Array<number>} viewport Viewport as returned from {@link module:ol/extent.getRotatedViewport}.
+   * @return {boolean} The tile with the provided tile coordinate intersects the given viewport.
+   */
+  TileGrid.prototype.tileCoordIntersectsViewport = function (tileCoord, viewport) {
+    return intersectsLinearRing(viewport, 0, viewport.length, 2, this.getTileCoordExtent(tileCoord));
+  };
+  /**
    * @param {!import("../extent.js").Extent} extent Extent for this tile grid.
    * @private
    */
@@ -39155,11 +39368,11 @@ function wrapX(tileGrid, tileCoord, projection) {
  *     DEFAULT_MAX_ZOOM).
  * @param {number|import("./size.js").Size} [opt_tileSize] Tile size (default uses
  *     DEFAULT_TILE_SIZE).
- * @param {import("./extent/Corner.js").default} [opt_corner] Extent corner (default is `'top-left'`).
+ * @param {import("./extent.js").Corner} [opt_corner] Extent corner (default is `'top-left'`).
  * @return {!TileGrid} TileGrid instance.
  */
 function createForExtent(extent, opt_maxZoom, opt_tileSize, opt_corner) {
-  var corner = opt_corner !== undefined ? opt_corner : Corner.TOP_LEFT;
+  var corner = opt_corner !== undefined ? opt_corner : 'top-left';
   var resolutions = resolutionsFromExtent(extent, opt_maxZoom, opt_tileSize);
   return new TileGrid({
     extent: extent,
@@ -39225,7 +39438,7 @@ function resolutionsFromExtent(extent, opt_maxZoom, opt_tileSize, opt_maxResolut
  *     DEFAULT_MAX_ZOOM).
  * @param {number|import("./size.js").Size} [opt_tileSize] Tile size (default uses
  *     DEFAULT_TILE_SIZE).
- * @param {import("./extent/Corner.js").default} [opt_corner] Extent corner (default is `'top-left'`).
+ * @param {import("./extent.js").Corner} [opt_corner] Extent corner (default is `'top-left'`).
  * @return {!TileGrid} TileGrid instance.
  */
 function createForProjection(projection, opt_maxZoom, opt_tileSize, opt_corner) {
@@ -39284,7 +39497,7 @@ var __extends$4 = undefined && undefined.__extends || function () {
  * @property {boolean} [opaque=false] Whether the layer is opaque.
  * @property {number} [tilePixelRatio] TilePixelRatio.
  * @property {import("../proj.js").ProjectionLike} [projection] Projection.
- * @property {import("./State.js").default} [state] State.
+ * @property {import("./Source.js").State} [state] State.
  * @property {import("../tilegrid/TileGrid.js").default} [tileGrid] TileGrid.
  * @property {boolean} [wrapX=false] WrapX.
  * @property {number} [transition] Transition.
@@ -39506,7 +39719,8 @@ var TileSource = /** @class */function (_super) {
    * @protected
    */
   TileSource.prototype.getTileCacheForProjection = function (projection) {
-    assert(equivalent(this.getProjection(), projection), 68 // A VectorTile source can only be rendered if it has a projection compatible with the view projection.
+    var sourceProjection = this.getProjection();
+    assert(sourceProjection === null || equivalent(sourceProjection, projection), 68 // A VectorTile source can only be rendered if it has a projection compatible with the view projection.
     );
 
     return this.tileCache;
@@ -39742,7 +39956,7 @@ var __extends$3 = undefined && undefined.__extends || function () {
  * @property {number} [cacheSize] Cache size.
  * @property {boolean} [opaque=false] Whether the layer is opaque.
  * @property {import("../proj.js").ProjectionLike} [projection] Projection.
- * @property {import("./State.js").default} [state] State.
+ * @property {import("./Source.js").State} [state] State.
  * @property {import("../tilegrid/TileGrid.js").default} [tileGrid] TileGrid.
  * @property {import("../Tile.js").LoadFunction} tileLoadFunction TileLoadFunction.
  * @property {number} [tilePixelRatio] TilePixelRatio.
@@ -39968,7 +40182,7 @@ var __extends$2 = undefined && undefined.__extends || function () {
  * @property {import("../proj.js").ProjectionLike} [projection] Projection. Default is the view projection.
  * @property {number} [reprojectionErrorThreshold=0.5] Maximum allowed reprojection error (in pixels).
  * Higher values can increase reprojection performance, but decrease precision.
- * @property {import("./State.js").default} [state] Source state.
+ * @property {import("./Source.js").State} [state] Source state.
  * @property {typeof import("../ImageTile.js").default} [tileClass] Class used to instantiate image tiles.
  * Default is {@link module:ol/ImageTile~ImageTile}.
  * @property {import("../tilegrid/TileGrid.js").default} [tileGrid] Tile grid.
@@ -40365,6 +40579,9 @@ var __extends$1 = undefined && undefined.__extends || function () {
  * should be set to `2`.
  * @property {number|import("../size.js").Size} [tileSize=[256, 256]] The tile size used by the tile service.
  * Not used if `tileGrid` is provided.
+ * @property {number} [gutter=0] The size in pixels of the gutter around image tiles to ignore.
+ * This allows artifacts of rendering at tile edges to be ignored.
+ * Supported images should be wider and taller than the tile size by a value of `2 x gutter`.
  * @property {import("../Tile.js").UrlFunction} [tileUrlFunction] Optional function to get
  * tile URL given a tile coordinate and the projection.
  * Required if `url` or `urls` are not provided.
@@ -40402,6 +40619,7 @@ var XYZ = /** @class */function (_super) {
    * @param {Options} [opt_options] XYZ options.
    */
   function XYZ(opt_options) {
+    var _this = this;
     var options = opt_options || {};
     var interpolate = options.imageSmoothing !== undefined ? options.imageSmoothing : true;
     if (options.interpolate !== undefined) {
@@ -40415,7 +40633,7 @@ var XYZ = /** @class */function (_super) {
       minZoom: options.minZoom,
       tileSize: options.tileSize
     });
-    return _super.call(this, {
+    _this = _super.call(this, {
       attributions: options.attributions,
       cacheSize: options.cacheSize,
       crossOrigin: options.crossOrigin,
@@ -40434,7 +40652,19 @@ var XYZ = /** @class */function (_super) {
       attributionsCollapsible: options.attributionsCollapsible,
       zDirection: options.zDirection
     }) || this;
+    /**
+     * @private
+     * @type {number}
+     */
+    _this.gutter_ = options.gutter !== undefined ? options.gutter : 0;
+    return _this;
   }
+  /**
+   * @return {number} Gutter.
+   */
+  XYZ.prototype.getGutter = function () {
+    return this.gutter_;
+  };
   return XYZ;
 }(TileImage);
 
