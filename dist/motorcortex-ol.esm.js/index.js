@@ -40694,7 +40694,7 @@ var devDependencies = {
 	tslib: "2.5.2",
 	webpack: "5.75.0",
 	"webpack-cli": "4.10.0",
-	"webpack-dev-server": "4.11.1"
+	"webpack-dev-server": "4.15.0"
 };
 var packageJSON = {
 	name: name,
